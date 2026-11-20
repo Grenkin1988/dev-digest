@@ -172,6 +172,11 @@ export const PrMeta = z.object({
   updated_at: z.string().nullish(),
   // Latest-review score (list endpoint only; null/absent until reviewed).
   score: z.number().int().nullish(),
+  // Usage of the latest review round (runs launched together), summed.
+  // Null/absent when no completed run in that round has usage data.
+  cost_usd: z.number().nullish(),
+  tokens_in: z.number().int().nullish(),
+  tokens_out: z.number().int().nullish(),
 });
 export type PrMeta = z.infer<typeof PrMeta>;
 

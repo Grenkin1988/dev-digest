@@ -1,6 +1,7 @@
 import type { Db } from '../../db/client.js';
 import * as t from '../../db/schema.js';
 import type { Finding, Intent, RunSummary, RunTrace } from '@devdigest/shared';
+import type { CostEstimator, RunUsageRow } from './cost.js';
 
 /**
  * A2 — review data-access. The ONLY layer touching the DB for the review
@@ -78,8 +79,12 @@ export class ReviewRepository {
   }
 
   /** All runs for a PR (any status), newest first — the PR run history. */
-  listRunsForPull(workspaceId: string, prId: string): Promise<RunSummary[]> {
-    return runRepo.listRunsForPull(this.db, workspaceId, prId);
+  listRunsForPull(workspaceId: string, prId: string, estimate: CostEstimator): Promise<RunSummary[]> {
+    return runRepo.listRunsForPull(this.db, workspaceId, prId, estimate);
+  }
+
+  getRunUsage(runId: string): Promise<RunUsageRow | undefined> {
+    return runRepo.getRunUsage(this.db, runId);
   }
 
   /** Delete one agent run (+ its trace via FK cascade). Workspace-scoped. */
@@ -144,6 +149,7 @@ export class ReviewRepository {
     prId: string;
     provider: string | null;
     model: string | null;
+    batchId?: string | null;
   }): Promise<string> {
     return runRepo.createAgentRun(this.db, values);
   }
@@ -155,6 +161,8 @@ export class ReviewRepository {
       durationMs: number;
       tokensIn: number;
       tokensOut: number;
+      /** USD cost reported by the engine; null = unknown. */
+      costUsd?: number | null;
       findingsCount: number;
       grounding: string;
       /** Review score (0-100); null on failed/cancelled runs. */

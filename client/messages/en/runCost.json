@@ -1,0 +1,7 @@
+{
+  "noData": "No usage data for this run",
+  "title": "Cost {cost} · {tokensIn} tokens in → {tokensOut} tokens out",
+  "tokens": "{count} tok",
+  "overviewLabel": "Review cost",
+  "overviewHint": "Latest review round: summed cost and tokens of the agents run together"
+}
