@@ -11,9 +11,10 @@ user asks about FIRST — these are curated and may already answer it — then r
   relevant points back — this forces an active read and catches a silently-failed load.
 - **Before recording an insight:** re-read that package's `INSIGHTS.md` and do not duplicate
   what's already there.
-- **End of session:** review what you learned. Record only substantial, file-grounded,
-  non-duplicate findings; if nothing substantial came up, write nothing — but don't skip the
-  check. Writes are strictly append-only (never overwrite an `INSIGHTS.md`).
+- **During and at end of session:** run `/engineering-insights` (also auto-triggers on
+  non-obvious findings). Record only substantial, file-grounded, non-duplicate findings; if
+  nothing substantial came up, write nothing — but don't skip the check. Writes are strictly
+  append-only (never overwrite an `INSIGHTS.md`).
 - **Adding a doc or spec:** add its row to that folder's `README.md` in the same change.
 
 ## Conventions (not obvious from code)
@@ -30,3 +31,4 @@ user asks about FIRST — these are curated and may already answer it — then r
 - Writing or changing tests → read `TESTING.md`
 - Repo indexing → read `server/src/modules/repo-intel/README.md`
 - Agent prompt templates → read `docs/agent-prompts/`
+- Recording a finding into a module's `INSIGHTS.md` → use the `engineering-insights` skill (`.claude/skills/engineering-insights/`)

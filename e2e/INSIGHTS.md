@@ -3,13 +3,19 @@
 Append-only: never overwrite this file. Re-read it before adding an entry so you do not
 duplicate one. Date each entry, cite the file it is grounded in, and record only
 substantial findings (prefer "X times out after 30 items" over "X can be tricky").
+Every entry belongs under one of the 7 sections below. Written by the
+`engineering-insights` skill (`.claude/skills/engineering-insights/`).
 
-## What works
+## What Works
 
-## What doesn't work
+## What Doesn't Work
 
-## Codebase patterns
+## Codebase Patterns
 
-## Recurring errors & fixes
+## Tool & Library Notes
 
-## Open questions
+## Recurring Errors & Fixes
+
+## Session Notes
+
+## Open Questions
