@@ -91,6 +91,7 @@
       "author": "Author",
       "size": "Size",
       "score": "Score",
+      "findings": "Findings",
       "status": "Status",
       "cost": "Cost",
       "updated": "Updated"
@@ -106,5 +107,14 @@
     "goToReview": "Jump to this run’s findings below",
     "openTrace": "Open run trace & logs",
     "deleteRun": "Delete run"
+  },
+  "severityCounters": {
+    "groupLabel": "Findings by severity",
+    "ariaLabel": "{count} {level} {count, plural, one {finding} other {findings}}",
+    "popoverTitle": "{count} {level} {count, plural, one {finding} other {findings}}",
+    "none": "No {level} findings",
+    "more": "+{count} more",
+    "filterHint": "Click to show only {level} findings",
+    "clearHint": "Click again to show all findings"
   }
 }
