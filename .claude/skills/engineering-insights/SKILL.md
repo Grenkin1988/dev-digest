@@ -52,6 +52,11 @@ Append a bullet under the matching `##` section:
 - **YYYY-MM-DD** — <concrete, actionable insight → what to do>. Evidence: `path/file.ts:NN` (<symbol>).
 ```
 
+**The line number is mandatory.** Every `Evidence:` path carries `:NN`, the line where the cited
+symbol is defined or where the behaviour happens. Get it with `grep -n "<symbol>" <file>` at
+write time, not from memory. Write paths relative to the repo root. With several files, give each its
+own `path:NN (symbol)`. A non-code file still gets a line, e.g. `server/package.json:11` (typecheck script).
+
 Session Notes instead group under a dated subheading:
 
 ```
@@ -80,8 +85,10 @@ Copy this checklist and work through it:
 2. **Read first.** Open each touched module's `INSIGHTS.md` (see "Where") before drafting anything.
 3. **Draft ≤5 candidates**, ranked by signal (user corrections and gotchas highest; nice-to-know patterns
    lowest). Each candidate = the exact proposed line + target section + `file:line` evidence.
+   **Reject any candidate whose Evidence has a path without `:NN`.** Look the line up, or drop it.
 4. **Dedup.** Grep the file for the key symbol / error text; drop any candidate already covered. If reality
-   contradicts an old entry, add a new dated note `Supersedes YYYY-MM-DD entry: …` — never edit the old one.
+   contradicts an old entry, add a new dated note `Supersedes YYYY-MM-DD entry: …`. The only exceptions,
+   which are edited in place, are listed under "Allowed in-place edits" below.
 5. **Append** the survivors (automatic — no approval prompt).
 6. **Summary.** One line: what was written, to which file, what was skipped.
 
@@ -89,6 +96,9 @@ Copy this checklist and work through it:
 - **Re-read the target `INSIGHTS.md` immediately before writing** — it may have changed since the session started.
 - **Insert with an anchored `Edit`** that adds the bullet at the end of the correct `##` section.
   **Never use `Write` on an existing `INSIGHTS.md`** — it replaces the whole file.
-- **Preserve verbatim** the header, preamble, every heading and every existing entry. Content is only ever added.
+- **Preserve verbatim** the header, preamble, every heading and every existing entry. Content is only ever added, except for the allowed in-place edits below.
 - **Corrections are additive** — supersede with a new dated note; never rewrite or delete.
+- **Allowed in-place edits** (anchored `Edit` of the one entry, keeping its date and meaning):
+  (a) adding or refreshing `:NN` on an existing `Evidence:` path, e.g. when the code moved;
+  (b) fixing an entry that **this same session's** code change made wrong. Anything else is a superseding note.
 - **Idempotent** — if an equivalent entry already exists, skip it.

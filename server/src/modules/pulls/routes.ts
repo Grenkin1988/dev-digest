@@ -8,7 +8,7 @@ import { getContext } from '../_shared/context.js';
 import { IdParams } from '../_shared/schemas.js';
 import { AppError, NotFoundError } from '../../platform/errors.js';
 import { deriveReviewStatus } from './status.js';
-import { latestRoundUsageForPulls } from '../reviews/repository/run.repo.js';
+import { usageForPulls } from '../reviews/repository/run.repo.js';
 import type { CostEstimator } from '../reviews/cost.js';
 
 /**
@@ -135,7 +135,7 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
       }
     }
 
-    const usageByPr = await latestRoundUsageForPulls(container.db, prIds, estimate);
+    const usageByPr = (await usageForPulls(container.db, prIds, estimate)).total;
 
     const now = Date.now();
     return rows.map((r) => {
@@ -184,11 +184,16 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
       .where(eq(t.repos.id, pr.repoId));
     if (!repo) throw new NotFoundError('Repo not found');
 
-    const usage = (await latestRoundUsageForPulls(container.db, [pr.id], estimate)).get(pr.id);
+    const { total, latestRound } = await usageForPulls(container.db, [pr.id], estimate);
+    const usage = total.get(pr.id);
+    const round = latestRound.get(pr.id);
     const usageFields = {
       cost_usd: usage?.cost_usd ?? null,
       tokens_in: usage?.tokens_in ?? null,
       tokens_out: usage?.tokens_out ?? null,
+      latest_round_cost_usd: round?.cost_usd ?? null,
+      latest_round_tokens_in: round?.tokens_in ?? null,
+      latest_round_tokens_out: round?.tokens_out ?? null,
     };
 
     // Local-first: refresh detail from GitHub when a token is configured;

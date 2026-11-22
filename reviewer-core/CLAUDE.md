@@ -7,6 +7,12 @@ Search this package's `docs/`, `specs/` and `INSIGHTS.md` (start from `docs/READ
 `specs/README.md`) for what the user asks about FIRST — they are curated and may already
 answer it — then read code.
 
+## Commands
+- `pnpm test`: Vitest (`test/*.test.ts`) · one file: `pnpm exec vitest run test/prompt.test.ts`
+- `pnpm typecheck` (`pnpm build` is the same thing because the package emits no JS).
+- After a prompt or pipeline change, also run the server's prompt tests:
+  `cd ../server && pnpm exec vitest run test/prompt-structured.test.ts test/prompt-callers.test.ts`
+
 ## Conventions (not obvious from code)
 - Pure logic: NO database, GitHub or filesystem access. The only side effect is an
   LLM call through the injected `LLMProvider`.

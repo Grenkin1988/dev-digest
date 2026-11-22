@@ -7,6 +7,13 @@ Search this package's `docs/`, `specs/` and `INSIGHTS.md` (start from `docs/READ
 `specs/README.md`) for what the user asks about FIRST — they are curated and may already
 answer it — then read code.
 
+## Commands
+- `pnpm dev`: web on :3000 (expects the API on :3001).
+- `pnpm test`: Vitest + React Testing Library · one file: `pnpm exec vitest run <path>`
+- `pnpm typecheck`: run it as well as tests. It catches contract mismatches that vitest
+  doesn't, e.g. invalid `Severity` values in fixtures.
+- `pnpm build`: production build.
+
 ## Conventions (not obvious from code)
 - Data only through the TanStack Query hooks in `src/lib/hooks/*` over `src/lib/api.ts`.
 - UI strings go through next-intl (`messages/<locale>/*.json`), not literals.

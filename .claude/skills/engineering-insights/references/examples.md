@@ -36,7 +36,7 @@ What makes the right column work: a concrete place, a concrete symptom, a concre
 - Decided to keep chunking in reviewer-core, not server (server stays transport-only).
 
 ## Open Questions
-- **2026-11-20** — Unclear whether repo-intel re-indexes on force-push or only on new commits; observed a stale index once, not reproduced. Evidence: `server/src/modules/repo-intel/service.ts` (reindex).
+- **2026-11-20** — Unclear whether repo-intel re-indexes on force-push or only on new commits; observed a stale index once, not reproduced. Evidence: `server/src/modules/repo-intel/service.ts:64` (reindex).
 ```
 
 ## Never write

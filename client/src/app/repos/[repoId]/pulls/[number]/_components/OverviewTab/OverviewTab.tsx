@@ -8,14 +8,24 @@ import { RunCostBadge } from "@/components/run-cost-badge";
 import { s } from "./styles";
 
 interface OverviewTabProps {
-  pr: Pick<PrDetail, "body" | "cost_usd" | "tokens_in" | "tokens_out">;
+  pr: Pick<
+    PrDetail,
+    | "body"
+    | "cost_usd"
+    | "tokens_in"
+    | "tokens_out"
+    | "latest_round_cost_usd"
+    | "latest_round_tokens_in"
+    | "latest_round_tokens_out"
+  >;
 }
 
 export function OverviewTab({ pr }: OverviewTabProps) {
   const t = useTranslations("runCost");
   return (
     <>
-      {/* Latest review round's usage — "—" until a run with usage data completes. */}
+      {/* Total of all completed runs, then the latest round alone — "—" until
+          a run with usage data completes. */}
       <div style={s.costRow} title={t("overviewHint")} data-testid="overview-cost">
         <Icon.DollarSign size={12} />
         <span>{t("overviewLabel")}</span>
@@ -24,6 +34,19 @@ export function OverviewTab({ pr }: OverviewTabProps) {
           costUsd={pr.cost_usd}
           tokensIn={pr.tokens_in}
           tokensOut={pr.tokens_out}
+        />
+      </div>
+      <div
+        style={s.costRow}
+        title={t("overviewLatestHint")}
+        data-testid="overview-cost-latest-round"
+      >
+        <span>{t("overviewLatestLabel")}</span>
+        <RunCostBadge
+          variant="detailed"
+          costUsd={pr.latest_round_cost_usd}
+          tokensIn={pr.latest_round_tokens_in}
+          tokensOut={pr.latest_round_tokens_out}
         />
       </div>
       {pr.body && (

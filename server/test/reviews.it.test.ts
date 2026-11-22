@@ -219,6 +219,9 @@ d('A2 reviews + agents (Testcontainers pg)', () => {
     const detail = (await app.inject({ method: 'GET', url: `/pulls/${pr.id}` })).json();
     expect(detail.cost_usd).toBe(run!.costUsd);
     expect(detail.tokens_in).toBe(run!.tokensIn);
+    // One round so far: the total equals the latest round.
+    expect(detail.latest_round_cost_usd).toBe(run!.costUsd);
+    expect(detail.latest_round_tokens_in).toBe(run!.tokensIn);
 
     await app.close();
   });

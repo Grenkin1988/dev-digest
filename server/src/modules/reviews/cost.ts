@@ -63,22 +63,45 @@ export function latestRoundUsage(
   }
 
   const out = new Map<string, RoundUsage>();
-  for (const [prId, { rows: runs }] of roundOf) {
-    let tokensIn = 0;
-    let tokensOut = 0;
-    let cost: number | null = null;
-    for (const r of runs) {
-      tokensIn += r.tokensIn ?? 0;
-      tokensOut += r.tokensOut ?? 0;
-      const c = runCost(r, estimate);
-      if (c != null) cost = (cost ?? 0) + c;
-    }
-    const hasTokens = tokensIn + tokensOut > 0;
-    out.set(prId, {
-      cost_usd: cost,
-      tokens_in: hasTokens ? tokensIn : null,
-      tokens_out: hasTokens ? tokensOut : null,
-    });
-  }
+  for (const [prId, { rows: runs }] of roundOf) out.set(prId, sumUsage(runs, estimate));
   return out;
+}
+
+/**
+ * Usage of ALL of a PR's review rounds, i.e. what reviewing the PR has cost
+ * so far. `rows` must be COMPLETED runs only, in any order. Uses the same sum
+ * rules as `latestRoundUsage`.
+ */
+export function totalUsage(
+  rows: RoundRunRow[],
+  estimate: CostEstimator,
+): Map<string, RoundUsage> {
+  const runsOf = new Map<string, RoundRunRow[]>();
+  for (const r of rows) {
+    const runs = runsOf.get(r.prId);
+    if (runs) runs.push(r);
+    else runsOf.set(r.prId, [r]);
+  }
+  const out = new Map<string, RoundUsage>();
+  for (const [prId, runs] of runsOf) out.set(prId, sumUsage(runs, estimate));
+  return out;
+}
+
+/** Tokens summed; cost summed over runs that have one, else null (unknown, not $0). */
+function sumUsage(runs: RunUsageRow[], estimate: CostEstimator): RoundUsage {
+  let tokensIn = 0;
+  let tokensOut = 0;
+  let cost: number | null = null;
+  for (const r of runs) {
+    tokensIn += r.tokensIn ?? 0;
+    tokensOut += r.tokensOut ?? 0;
+    const c = runCost(r, estimate);
+    if (c != null) cost = (cost ?? 0) + c;
+  }
+  const hasTokens = tokensIn + tokensOut > 0;
+  return {
+    cost_usd: cost,
+    tokens_in: hasTokens ? tokensIn : null,
+    tokens_out: hasTokens ? tokensOut : null,
+  };
 }

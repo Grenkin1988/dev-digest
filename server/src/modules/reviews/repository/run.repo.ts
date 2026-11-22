@@ -5,6 +5,7 @@ import type { RunSummary, RunTrace } from '@devdigest/shared';
 import {
   latestRoundUsage,
   runCost,
+  totalUsage,
   type CostEstimator,
   type RoundUsage,
   type RunUsageRow,
@@ -76,17 +77,24 @@ export async function listRunsForPull(
   }));
 }
 
+export interface PrUsage {
+  /** All completed runs of each PR: the PR list COST and the Overview total. */
+  total: Map<string, RoundUsage>;
+  /** Each PR's latest review round only: the Overview "latest round" line. */
+  latestRound: Map<string, RoundUsage>;
+}
+
 /**
- * Latest-review-round usage (cost + tokens) per PR, for the PR list/detail.
- * Only completed runs count, so an in-flight round keeps showing the previous
- * one. See `latestRoundUsage` for the round/aggregation rules.
+ * Usage (cost + tokens) per PR, for the PR list/detail, from one query. Only
+ * completed runs count, so an in-flight round is not yet included. See
+ * `totalUsage` / `latestRoundUsage` for the aggregation rules.
  */
-export async function latestRoundUsageForPulls(
+export async function usageForPulls(
   db: Db,
   prIds: string[],
   estimate: CostEstimator,
-): Promise<Map<string, RoundUsage>> {
-  if (prIds.length === 0) return new Map();
+): Promise<PrUsage> {
+  if (prIds.length === 0) return { total: new Map(), latestRound: new Map() };
   const rows = await db
     .select({
       prId: t.agentRuns.prId,
@@ -99,10 +107,11 @@ export async function latestRoundUsageForPulls(
     .from(t.agentRuns)
     .where(and(inArray(t.agentRuns.prId, prIds), eq(t.agentRuns.status, 'done')))
     .orderBy(desc(t.agentRuns.ranAt));
-  return latestRoundUsage(
-    rows.filter((r): r is typeof r & { prId: string } => r.prId != null),
-    estimate,
-  );
+  const runs = rows.filter((r): r is typeof r & { prId: string } => r.prId != null);
+  return {
+    total: totalUsage(runs, estimate),
+    latestRound: latestRoundUsage(runs, estimate),
+  };
 }
 
 /** One run's usage row (for back-filling cost into traces stored without it). */

@@ -2,6 +2,8 @@
   "noData": "No usage data for this run",
   "title": "Cost {cost} · {tokensIn} tokens in → {tokensOut} tokens out",
   "tokens": "{count} tok",
-  "overviewLabel": "Review cost",
-  "overviewHint": "Latest review round: summed cost and tokens of the agents run together"
+  "overviewLabel": "Total review cost",
+  "overviewHint": "All completed review runs of this PR: summed cost and tokens",
+  "overviewLatestLabel": "Latest round",
+  "overviewLatestHint": "Latest review round only: summed cost and tokens of the agents run together"
 }

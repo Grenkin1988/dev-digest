@@ -2,6 +2,27 @@
 
 Local-first AI PR reviewer. Course starter: Part-0 works end to end; each lesson adds one feature.
 
+## Stack
+- `client/` — Next.js 15 (App Router) + React 19, TanStack Query, next-intl; web on :3000.
+- `server/` — Fastify + Zod contracts, Drizzle ORM on Postgres + pgvector (Docker); API on :3001.
+- `reviewer-core/` — pure TS review engine, consumed by the server as source via a path alias.
+- `e2e/` — deterministic JSON browser flows on seeded data.
+- Tooling: Node ≥ 22, pnpm ≥ 10, Vitest everywhere, Docker for Postgres.
+
+## Commands
+Run each from inside its package (each has its own lockfile). Full detail is in `README.md`.
+
+| Task | Command |
+|------|---------|
+| Everything (Postgres + API + web) | `./scripts/dev.sh` |
+| Postgres only | `docker compose up -d` |
+| Migrate / seed DB (NOT run on boot) | `cd server && pnpm db:migrate && pnpm db:seed` |
+| Dev servers | `cd server && pnpm dev` · `cd client && pnpm dev` |
+| Tests | `pnpm test` in `server/`, `client/`, `reviewer-core/` |
+| One test file | `pnpm exec vitest run <path>` |
+| Typecheck | `pnpm typecheck` in any package |
+| E2E (hermetic, own ports + DB) | `cd e2e && pnpm e2e:hermetic` |
+
 ## Before answering
 Always search the relevant package's `docs/`, `specs/`, and `INSIGHTS.md` for what the
 user asks about FIRST — these are curated and may already answer it — then read code.
@@ -13,8 +34,12 @@ user asks about FIRST — these are curated and may already answer it — then r
   what's already there.
 - **During and at end of session:** run `/engineering-insights` (also auto-triggers on
   non-obvious findings). Record only substantial, file-grounded, non-duplicate findings; if
-  nothing substantial came up, write nothing — but don't skip the check. Writes are strictly
-  append-only (never overwrite an `INSIGHTS.md`).
+  nothing substantial came up, write nothing — but don't skip the check. Writes are
+  append-only (never overwrite an `INSIGHTS.md`). The only in-place edits allowed are
+  (a) adding or refreshing `file:line` evidence, and (b) fixing an entry that this same
+  session's code change made wrong. Any other correction is a new superseding entry.
+- **Evidence:** every INSIGHTS entry cites `path/file.ts:NN (symbol)`. A line number is
+  mandatory so the next developer knows where to look.
 - **Adding a doc or spec:** add its row to that folder's `README.md` in the same change.
 
 ## Conventions (not obvious from code)

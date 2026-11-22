@@ -156,7 +156,7 @@ export default function PRDetailPage() {
             onRunDone={() => {
               invalidateActiveRuns();
               invalidateRunHistory();
-              // PR-level cost (Overview) is the latest round's usage.
+              // PR-level cost (Overview): total of all runs + the latest round.
               if (prId) qc.invalidateQueries({ queryKey: ["pull", prId] });
               refetchReviews();
             }}

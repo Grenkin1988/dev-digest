@@ -7,6 +7,11 @@ Search this package's `docs/`, `specs/` and `INSIGHTS.md` (start from `docs/READ
 `specs/README.md`) for what the user asks about FIRST — they are curated and may already
 answer it — then read code.
 
+## Commands
+- `pnpm e2e:hermetic`: the full run (`../scripts/e2e.sh`), using its own ports and a throwaway Postgres.
+- `pnpm test`: runs the flows (`tsx run.ts`) against an app that is already running (`E2E_BASE_URL`, default `http://localhost:3000`).
+- `pnpm typecheck`
+
 ## Conventions (not obvious from code)
 - A flow is `specs/NN-name.flow.json`; `run.ts` runs only files ending in `.flow.json`.
 - Flows use seeded demo data and no LLM, so they stay deterministic.
