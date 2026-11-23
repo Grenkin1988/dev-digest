@@ -172,6 +172,11 @@ export const PrMeta = z.object({
   updated_at: z.string().nullish(),
   // Latest-review score (list endpoint only; null/absent until reviewed).
   score: z.number().int().nullish(),
+  // Usage of ALL completed review runs of the PR, summed (the real cost of
+  // reviewing it). Null/absent when no completed run has usage data.
+  cost_usd: z.number().nullish(),
+  tokens_in: z.number().int().nullish(),
+  tokens_out: z.number().int().nullish(),
 });
 export type PrMeta = z.infer<typeof PrMeta>;
 
@@ -204,6 +209,10 @@ export const PrDetail = PrMeta.extend({
   files: z.array(PrFile),
   commits: z.array(PrCommit),
   linked_issue: IssueMeta.nullish(),
+  // Usage of the latest review round only (runs launched together), summed.
+  latest_round_cost_usd: z.number().nullish(),
+  latest_round_tokens_in: z.number().int().nullish(),
+  latest_round_tokens_out: z.number().int().nullish(),
 });
 export type PrDetail = z.infer<typeof PrDetail>;
 

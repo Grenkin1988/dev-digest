@@ -4,7 +4,7 @@
  * truncation, and ordering (before the diff).
  */
 import { describe, it, expect } from 'vitest';
-import { assemblePrompt } from '../src/prompt.js';
+import { assemblePrompt, LANGUAGE_RULE } from '../src/prompt.js';
 
 function userOf(parts: Parameters<typeof assemblePrompt>[0]): string {
   const { messages } = assemblePrompt(parts);
@@ -29,6 +29,22 @@ describe('assemblePrompt — shared injection guard (server + CI)', () => {
     expect(sys).toMatch(/test fixture|intentional|demo/i);
     expect(sys).toMatch(/never reduce|never .*descope|REPORT it/i);
     expect(sys).toMatch(/any language/i);
+  });
+});
+
+describe('assemblePrompt — English-only output rule', () => {
+  it('appends the language rule after the agent prompt, in messages and assembly', () => {
+    const { messages, assembly } = assemblePrompt({ system: 'AGENT-SYS', diff: 'DIFF' });
+    const sys = messages[0]!.content;
+    expect(sys.startsWith('AGENT-SYS')).toBe(true);
+    expect(sys).toContain(LANGUAGE_RULE);
+    expect(sys).toMatch(/MUST respond entirely in English/);
+    expect(assembly.system).toBe(sys);
+  });
+
+  it('keeps the rule regardless of the PR language', () => {
+    const sys = systemOf({ system: 'sys', diff: 'DIFF', prDescription: '添加速率限制' });
+    expect(sys).toContain(LANGUAGE_RULE);
   });
 });
 

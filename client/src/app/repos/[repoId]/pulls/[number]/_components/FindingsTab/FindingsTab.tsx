@@ -71,6 +71,13 @@ export function FindingsTab({
     setTarget((p) => ({ runId, n: (p?.n ?? 0) + 1 }));
   }, []);
 
+  // Timeline severity counters reuse the already-loaded reviews (no extra fetch).
+  const findingsByRun = React.useMemo(() => {
+    const map: Record<string, FindingRecord[]> = {};
+    for (const r of runs) if (r.run_id) map[r.run_id] = r.findings;
+    return map;
+  }, [runs]);
+
   return (
     <section>
       {liveRunIds.length > 0 && (
@@ -134,6 +141,7 @@ export function FindingsTab({
             onOpenTrace={handleOpenTrace}
             onGoToReview={handleGoToReview}
             onDelete={handleDelete}
+            findingsByRun={findingsByRun}
           />
         </div>
       )}

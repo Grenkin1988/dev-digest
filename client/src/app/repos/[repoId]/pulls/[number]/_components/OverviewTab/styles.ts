@@ -1,6 +1,14 @@
 import type { CSSProperties } from "react";
 
 export const s = {
+  costRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 6,
+    fontSize: 12,
+    color: "var(--text-muted)",
+  } satisfies CSSProperties,
   descriptionBox: {
     border: "1px solid var(--border)",
     borderRadius: 8,

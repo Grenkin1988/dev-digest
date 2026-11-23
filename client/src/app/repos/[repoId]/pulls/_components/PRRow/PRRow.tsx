@@ -9,9 +9,19 @@ import type { PrMeta } from "@/lib/types";
 import { SIZE_COLOR, STATUS_META } from "../../constants";
 import { relativeTime, sizeOf } from "../../helpers";
 import { s } from "../../styles";
+import { RunCostBadge } from "@/components/run-cost-badge";
+import { SeverityCounters, latestReviewPerAgent } from "@/components/severity-counters";
+import { usePrReviews } from "@/lib/hooks/reviews";
 
 export function PRRow({ pr, repoId }: { pr: PrMeta; repoId: string }) {
   const t = useTranslations("prReview");
+  // Same ["reviews", prId] cache as the PR detail page, so accept/dismiss there
+  // updates these counters without a reload. Latest run per agent, summed.
+  const { data: reviews } = usePrReviews(pr.id);
+  const findings = React.useMemo(
+    () => latestReviewPerAgent(reviews ?? []).flatMap((r) => r.findings),
+    [reviews],
+  );
   const router = useRouter();
   const [h, setH] = React.useState(false);
   const st = STATUS_META[pr.status] ?? STATUS_META.needs_review!;
@@ -54,9 +64,15 @@ export function PRRow({ pr, repoId }: { pr: PrMeta; repoId: string }) {
         )}
       </div>
       <div>
+        <SeverityCounters findings={findings} />
+      </div>
+      <div>
         <Badge dot color={st.c} bg="transparent">
           {t(`list.status.${st.labelKey}`)}
         </Badge>
+      </div>
+      <div>
+        <RunCostBadge variant="compact" costUsd={pr.cost_usd} />
       </div>
       <div style={s.updatedCell}>{relativeTime(pr.updated_at)}</div>
     </div>

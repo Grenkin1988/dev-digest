@@ -8,6 +8,8 @@ import { getContext } from '../_shared/context.js';
 import { IdParams } from '../_shared/schemas.js';
 import { AppError, NotFoundError } from '../../platform/errors.js';
 import { deriveReviewStatus } from './status.js';
+import { usageForPulls } from '../reviews/repository/run.repo.js';
+import type { CostEstimator } from '../reviews/cost.js';
 
 /**
  * F1 — pulls module. PR import via Octokit (list + per-PR detail).
@@ -22,6 +24,10 @@ import { deriveReviewStatus } from './status.js';
 export default async function pullsRoutes(appBase: FastifyInstance) {
   const app = appBase.withTypeProvider<ZodTypeProvider>();
   const { container } = app;
+  // Cost of the latest review round, from stored usage (tokens x price as a
+  // fallback for older runs). Never calls a model.
+  const estimate: CostEstimator = (model, tokensIn, tokensOut) =>
+    container.priceBook.estimate(model, tokensIn, tokensOut);
 
   app.get('/repos/:id/pulls', { schema: { params: IdParams } }, async (req): Promise<PrMeta[]> => {
     const { workspaceId } = await getContext(container, req);
@@ -129,9 +135,12 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
       }
     }
 
+    const usageByPr = (await usageForPulls(container.db, prIds, estimate)).total;
+
     const now = Date.now();
     return rows.map((r) => {
       const review = latestReviewByPr.get(r.id);
+      const usage = usageByPr.get(r.id);
       return {
         id: r.id,
         number: r.number,
@@ -153,6 +162,9 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
         opened_at: r.openedAt?.toISOString() ?? null,
         updated_at: r.updatedAt?.toISOString() ?? null,
         score: review ? review.score : null,
+        cost_usd: usage?.cost_usd ?? null,
+        tokens_in: usage?.tokens_in ?? null,
+        tokens_out: usage?.tokens_out ?? null,
       };
     });
   });
@@ -171,6 +183,18 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
       .from(t.repos)
       .where(eq(t.repos.id, pr.repoId));
     if (!repo) throw new NotFoundError('Repo not found');
+
+    const { total, latestRound } = await usageForPulls(container.db, [pr.id], estimate);
+    const usage = total.get(pr.id);
+    const round = latestRound.get(pr.id);
+    const usageFields = {
+      cost_usd: usage?.cost_usd ?? null,
+      tokens_in: usage?.tokens_in ?? null,
+      tokens_out: usage?.tokens_out ?? null,
+      latest_round_cost_usd: round?.cost_usd ?? null,
+      latest_round_tokens_in: round?.tokens_in ?? null,
+      latest_round_tokens_out: round?.tokens_out ?? null,
+    };
 
     // Local-first: refresh detail from GitHub when a token is configured;
     // otherwise serve the persisted files/commits/body (seeded or previously
@@ -215,7 +239,7 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
         })
         .where(eq(t.pullRequests.id, pr.id));
 
-      return { ...detail, id: pr.id };
+      return { ...detail, id: pr.id, ...usageFields };
     } catch (err) {
       app.log.warn({ err }, 'GitHub PR detail refresh skipped (no token / offline); serving persisted detail');
       const files = await container.db.select().from(t.prFiles).where(eq(t.prFiles.prId, pr.id));
@@ -235,6 +259,7 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
         opened_at: pr.openedAt?.toISOString() ?? null,
         updated_at: pr.updatedAt?.toISOString() ?? null,
         body: pr.body ?? null,
+        ...usageFields,
         files: files.map((f) => ({
           path: f.path,
           additions: f.additions,

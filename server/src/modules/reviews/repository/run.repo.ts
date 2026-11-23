@@ -1,7 +1,15 @@
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import type { Db } from '../../../db/client.js';
 import * as t from '../../../db/schema.js';
 import type { RunSummary, RunTrace } from '@devdigest/shared';
+import {
+  latestRoundUsage,
+  runCost,
+  totalUsage,
+  type CostEstimator,
+  type RoundUsage,
+  type RunUsageRow,
+} from '../cost.js';
 
 // ---- in-flight / history --------------------------------------------------
 
@@ -41,6 +49,7 @@ export async function listRunsForPull(
   db: Db,
   workspaceId: string,
   prId: string,
+  estimate: CostEstimator,
 ): Promise<RunSummary[]> {
   const rows = await db
     .select({ run: t.agentRuns, agentName: t.agents.name })
@@ -59,12 +68,64 @@ export async function listRunsForPull(
     duration_ms: run.durationMs,
     tokens_in: run.tokensIn,
     tokens_out: run.tokensOut,
+    cost_usd: runCost(run, estimate),
     findings_count: run.findingsCount,
     grounding: run.grounding,
     ran_at: run.ranAt ? run.ranAt.toISOString() : null,
     score: run.score,
     blockers: run.blockers,
   }));
+}
+
+export interface PrUsage {
+  /** All completed runs of each PR: the PR list COST and the Overview total. */
+  total: Map<string, RoundUsage>;
+  /** Each PR's latest review round only: the Overview "latest round" line. */
+  latestRound: Map<string, RoundUsage>;
+}
+
+/**
+ * Usage (cost + tokens) per PR, for the PR list/detail, from one query. Only
+ * completed runs count, so an in-flight round is not yet included. See
+ * `totalUsage` / `latestRoundUsage` for the aggregation rules.
+ */
+export async function usageForPulls(
+  db: Db,
+  prIds: string[],
+  estimate: CostEstimator,
+): Promise<PrUsage> {
+  if (prIds.length === 0) return { total: new Map(), latestRound: new Map() };
+  const rows = await db
+    .select({
+      prId: t.agentRuns.prId,
+      batchId: t.agentRuns.batchId,
+      model: t.agentRuns.model,
+      tokensIn: t.agentRuns.tokensIn,
+      tokensOut: t.agentRuns.tokensOut,
+      costUsd: t.agentRuns.costUsd,
+    })
+    .from(t.agentRuns)
+    .where(and(inArray(t.agentRuns.prId, prIds), eq(t.agentRuns.status, 'done')))
+    .orderBy(desc(t.agentRuns.ranAt));
+  const runs = rows.filter((r): r is typeof r & { prId: string } => r.prId != null);
+  return {
+    total: totalUsage(runs, estimate),
+    latestRound: latestRoundUsage(runs, estimate),
+  };
+}
+
+/** One run's usage row (for back-filling cost into traces stored without it). */
+export async function getRunUsage(db: Db, runId: string): Promise<RunUsageRow | undefined> {
+  const [row] = await db
+    .select({
+      model: t.agentRuns.model,
+      tokensIn: t.agentRuns.tokensIn,
+      tokensOut: t.agentRuns.tokensOut,
+      costUsd: t.agentRuns.costUsd,
+    })
+    .from(t.agentRuns)
+    .where(eq(t.agentRuns.id, runId));
+  return row;
 }
 
 /**
@@ -121,6 +182,8 @@ export async function createAgentRun(
     prId: string;
     provider: string | null;
     model: string | null;
+    /** Review round: shared by all runs launched by one "Run review" request. */
+    batchId?: string | null;
   },
 ): Promise<string> {
   const [row] = await db
@@ -131,6 +194,7 @@ export async function createAgentRun(
       prId: values.prId,
       provider: values.provider,
       model: values.model,
+      batchId: values.batchId ?? null,
       status: 'running',
       source: 'local',
     })
@@ -146,6 +210,8 @@ export async function completeAgentRun(
     durationMs: number;
     tokensIn: number;
     tokensOut: number;
+    /** USD cost reported by the engine; null = unknown. */
+    costUsd?: number | null;
     findingsCount: number;
     grounding: string;
     /** Review score (0-100); null on failed/cancelled runs. */
@@ -163,6 +229,7 @@ export async function completeAgentRun(
       durationMs: values.durationMs,
       tokensIn: values.tokensIn,
       tokensOut: values.tokensOut,
+      costUsd: values.costUsd ?? null,
       findingsCount: values.findingsCount,
       grounding: values.grounding,
       score: values.score ?? null,

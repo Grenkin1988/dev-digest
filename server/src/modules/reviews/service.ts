@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { Container } from '../../platform/container.js';
 import type { FindingActionKind, RunEventKind, RunTrace } from '@devdigest/shared';
 import { AppError, NotFoundError } from '../../platform/errors.js';
@@ -7,6 +8,7 @@ import { type ReviewDto, type ReviewDtoFinding } from './helpers.js';
 import { ReviewRunExecutor, type Logger } from './run-executor.js';
 import { actOnFinding as actOnFindingImpl } from './findings.js';
 import { reviewToDto } from './helpers.js';
+import { runCost, type CostEstimator } from './cost.js';
 
 // Re-export DTO types + converters for backward-compatible imports from
 // './service.js' (these previously lived here; logic now in ./helpers.ts).
@@ -68,7 +70,7 @@ export class ReviewService {
 
   /** All runs for a PR (any status), newest first — the run history (incl. failures). */
   async listRuns(workspaceId: string, prId: string) {
-    return this.repo.listRunsForPull(workspaceId, prId);
+    return this.repo.listRunsForPull(workspaceId, prId, this.estimateCost);
   }
 
   /** Delete one run from the history (+ its trace). */
@@ -116,6 +118,9 @@ export class ReviewService {
     // stream. The actual (slow) review runs in the background below.
     const runs: { run_id: string; agent_id: string; agent_name: string }[] = [];
     const jobs: { agent: AgentRow; runId: string }[] = [];
+    // One id per request = one review round (the PR list/overview show the
+    // latest round's summed cost).
+    const batchId = randomUUID();
     for (const agent of targets) {
       const runId = await this.repo.createAgentRun({
         workspaceId,
@@ -123,6 +128,7 @@ export class ReviewService {
         prId,
         provider: agent.provider,
         model: agent.model,
+        batchId,
       });
       runs.push({ run_id: runId, agent_id: agent.id, agent_name: agent.name });
       jobs.push({ agent, runId });
@@ -173,7 +179,19 @@ export class ReviewService {
     );
   }
 
+  /**
+   * Run trace. Traces persisted before cost tracking carry no `stats.cost_usd`;
+   * back-fill it from the run row (stored cost, else tokens x price).
+   */
   async getRunTrace(runId: string): Promise<RunTrace | undefined> {
-    return this.repo.getRunTrace(runId);
+    const trace = await this.repo.getRunTrace(runId);
+    if (!trace || trace.stats.cost_usd != null) return trace;
+    const usage = await this.repo.getRunUsage(runId);
+    const cost = usage ? runCost(usage, this.estimateCost) : null;
+    return { ...trace, stats: { ...trace.stats, cost_usd: cost } };
   }
+
+  /** Live OpenRouter prices with the static table as fallback; never calls a model. */
+  private estimateCost: CostEstimator = (model, tokensIn, tokensOut) =>
+    this.container.priceBook.estimate(model, tokensIn, tokensOut);
 }
