@@ -35,3 +35,4 @@ answer it — then read code.
 - Routes, adapters, DI wiring → read `README.md`
 - Repo indexing → read `src/modules/repo-intel/README.md`
 - Writing tests → read `../TESTING.md`
+- Adding or changing a module, route, service, repository, adapter or job handler → use the `onion-architecture` skill (`../.claude/skills/onion-architecture/`)

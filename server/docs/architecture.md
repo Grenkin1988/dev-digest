@@ -64,6 +64,8 @@ sequenceDiagram
 
 ## Extension points
 
+Layering rules (which file may import what) live in the `onion-architecture` skill (`../../.claude/skills/onion-architecture/SKILL.md`).
+
 - **New feature module:** create `src/modules/<name>/routes.ts`, then add one import and one entry in `src/modules/index.ts`.
 - **New external system:** add an adapter in `src/adapters/`, expose it from the `Container`, and add a mock in `mocks.ts`.
 - **Contract change:** edit both `server/src/vendor/shared` and `client/src/vendor/shared`, because the two copies have already diverged.
