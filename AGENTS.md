@@ -46,13 +46,14 @@ user asks about FIRST — these are curated and may already answer it — then r
 - NOT a monorepo workspace — each package has its own package.json/lockfile; cross-package code is shared via tsconfig path aliases.
 - Modules are registered statically in `server/src/modules/index.ts` (no filesystem autoload).
 - ESM: relative imports carry the `.js` extension.
+- `AGENTS.md` is the source of truth for agent instructions; each `CLAUDE.md` is a one-line `@AGENTS.md` stub so Claude Code loads it — edit `AGENTS.md`, never the stub.
 
 ## Do-not-touch
 - `server/src/vendor/shared/` and `server/src/db/migrations/` — never hand-edit without coordination.
 
 ## Use when
 - Stack, commands, architecture, how to run → read `README.md`
-- Working inside a package → read that package's CLAUDE.md: `server/CLAUDE.md`, `client/CLAUDE.md`, `reviewer-core/CLAUDE.md`, `e2e/CLAUDE.md`
+- Working inside a package → read that package's AGENTS.md: `server/AGENTS.md`, `client/AGENTS.md`, `reviewer-core/AGENTS.md`, `e2e/AGENTS.md`
 - Writing or changing tests → read `TESTING.md`
 - Repo indexing → read `server/src/modules/repo-intel/README.md`
 - Agent prompt templates → read `docs/agent-prompts/`

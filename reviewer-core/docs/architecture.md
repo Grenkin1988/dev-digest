@@ -4,7 +4,7 @@ The pure review engine (`@devdigest/reviewer-core`). It takes a diff, the agent'
 and an LLM provider, and returns a grounded `Review`. It is shared by the server, for
 studio reviews, and by the CI agent-runner. It has no DB, GitHub or filesystem access;
 its only side effect is the call through the injected `LLMProvider`. It emits no JS: consumers
-import the TS source via a path alias. Commands are in [`../CLAUDE.md`](../CLAUDE.md).
+import the TS source via a path alias. Commands are in [`../AGENTS.md`](../AGENTS.md).
 
 ## Folder map
 

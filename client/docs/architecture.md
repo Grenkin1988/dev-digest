@@ -2,7 +2,7 @@
 
 Next.js 15 App Router web app (`@devdigest/web`) on :3000. It is a thin UI over the
 server API on :3001: all data goes through TanStack Query hooks, and UI strings
-through next-intl. Commands are in [`../CLAUDE.md`](../CLAUDE.md); the screen list is in
+through next-intl. Commands are in [`../AGENTS.md`](../AGENTS.md); the screen list is in
 [`../README.md`](../README.md).
 
 ## Route map (`src/app`)

@@ -2,7 +2,7 @@
 
 Fastify API (`@devdigest/api`) on :3001. It owns persistence (Drizzle on Postgres +
 pgvector), external integrations (GitHub, git, LLM providers), and runs reviews by
-calling `reviewer-core`. Commands are in [`../CLAUDE.md`](../CLAUDE.md); routes and
+calling `reviewer-core`. Commands are in [`../AGENTS.md`](../AGENTS.md); routes and
 adapters are listed in [`../README.md`](../README.md).
 
 ## Folder map
