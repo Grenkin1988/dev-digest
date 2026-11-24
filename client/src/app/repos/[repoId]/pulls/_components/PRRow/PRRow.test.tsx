@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent, within } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { FindingRecord, ReviewRecord } from "@devdigest/shared";
 import type { PrMeta } from "@/lib/types";
@@ -11,7 +11,7 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
 }));
 vi.mock("@/lib/hooks/reviews", () => ({
-  usePrReviews: (prId: string | null | undefined) => usePrReviews(prId),
+  usePrReviews: (prId: string | null | undefined, opts: { enabled?: boolean }) => usePrReviews(prId, opts),
 }));
 
 import { PRRow } from "./PRRow";
@@ -85,36 +85,45 @@ function renderRow(pr: PrMeta = PR) {
 }
 
 describe("PRRow findings column", () => {
-  it("sums the latest review per agent and skips dismissed findings", () => {
-    usePrReviews.mockReturnValue({
-      data: [
-        // Older security run is superseded by the newer one → not counted.
-        review("sec-old", "sec", "2026-11-19T10:00:00Z", [finding("o1", "CRITICAL"), finding("o2", "CRITICAL")]),
-        review("sec-new", "sec", "2026-11-20T10:00:00Z", [
-          finding("c1", "CRITICAL"),
-          finding("c2", "CRITICAL", true),
-          finding("w1", "WARNING"),
-        ]),
-        review("perf", "perf", "2026-11-20T09:00:00Z", [finding("w2", "WARNING"), finding("s1", "SUGGESTION")]),
-      ],
-    });
-    renderRow();
-    expect(usePrReviews).toHaveBeenCalledWith("pr1");
+  it("renders the server's severity counts without fetching any reviews", () => {
+    usePrReviews.mockReturnValue({ data: undefined, isLoading: false });
+    renderRow({ ...PR, severity_counts: { CRITICAL: 1, WARNING: 2, SUGGESTION: 1 } });
+    expect(usePrReviews).toHaveBeenCalledWith("pr1", { enabled: false });
     expect(screen.getByLabelText("1 Critical finding")).toHaveTextContent("1");
     expect(screen.getByLabelText("2 Warning findings")).toHaveTextContent("2");
     expect(screen.getByLabelText("1 Suggestion finding")).toHaveTextContent("1");
   });
 
   it("hides empty levels on the list", () => {
-    usePrReviews.mockReturnValue({ data: [review("r", "a", "2026-11-20T10:00:00Z", [finding("s", "SUGGESTION")])] });
-    renderRow();
+    usePrReviews.mockReturnValue({ data: undefined, isLoading: false });
+    renderRow({ ...PR, severity_counts: { CRITICAL: 0, WARNING: 0, SUGGESTION: 1 } });
     expect(screen.queryByLabelText(/Critical/)).toBeNull();
     expect(screen.getByLabelText("1 Suggestion finding")).toBeInTheDocument();
   });
 
   it("renders a dash when the PR has no reviews yet", () => {
-    usePrReviews.mockReturnValue({ data: undefined });
-    renderRow({ ...PR, score: null });
+    usePrReviews.mockReturnValue({ data: undefined, isLoading: false });
+    renderRow({ ...PR, score: null, severity_counts: null });
     expect(screen.getByTestId("severity-counters")).toHaveTextContent(/^—$/);
+  });
+
+  it("fetches the findings lazily when a popover opens, then lists them", () => {
+    usePrReviews.mockImplementation((_id: string, opts: { enabled: boolean }) =>
+      opts.enabled
+        ? {
+            data: [
+              review("sec-old", "sec", "2026-11-19T10:00:00Z", [finding("old", "CRITICAL")]),
+              review("sec-new", "sec", "2026-11-20T10:00:00Z", [finding("Hardcoded secret", "CRITICAL")]),
+            ],
+            isLoading: false,
+          }
+        : { data: undefined, isLoading: false },
+    );
+    renderRow({ ...PR, severity_counts: { CRITICAL: 1, WARNING: 0, SUGGESTION: 0 } });
+    fireEvent.mouseEnter(screen.getByLabelText("1 Critical finding").parentElement!);
+    expect(usePrReviews).toHaveBeenLastCalledWith("pr1", { enabled: true });
+    const tip = screen.getByRole("tooltip");
+    expect(within(tip).getByText("Hardcoded secret")).toBeInTheDocument();
+    expect(within(tip).queryByText("old")).toBeNull();
   });
 });

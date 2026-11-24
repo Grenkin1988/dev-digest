@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { mkdtemp, rm, mkdir, writeFile, readFile, access } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { SimpleGitClient, UnsafeClonePathError } from '../src/adapters/git/simple-git.js';
 
 /**
@@ -42,7 +42,10 @@ describe('SimpleGitClient.clonePathFor', () => {
   const client = () => new SimpleGitClient('/tmp/dd-clones');
 
   it('maps owner/name under cloneDir', () => {
-    expect(client().clonePathFor({ owner: 'acme', name: 'widgets' })).toBe('/tmp/dd-clones/acme/widgets');
+    // resolve(): on Windows the adapter's absolute path gains a drive letter + backslashes.
+    expect(client().clonePathFor({ owner: 'acme', name: 'widgets' })).toBe(
+      resolve('/tmp/dd-clones', 'acme', 'widgets'),
+    );
   });
 
   it.each([
@@ -65,7 +68,9 @@ describe('SimpleGitClient.clone', () => {
     const { path } = await client.clone({ owner: 'acme', name: 'widgets' }, upstream, { depth: 1 });
 
     expect(path).toBe(join(cloneDir, 'acme', 'widgets'));
-    expect(await readFile(join(path, 'README.md'), 'utf8')).toBe('hello\n');
+    // git may check out with CRLF (core.autocrlf on Windows); compare line content.
+    const readme = await readFile(join(path, 'README.md'), 'utf8');
+    expect(readme.replace(/\r\n/g, '\n')).toBe('hello\n');
     const config = await readFile(join(path, '.git', 'config'), 'utf8');
     expect(config).not.toContain(token);
     expect(config).not.toContain('extraHeader');

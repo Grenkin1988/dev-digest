@@ -83,6 +83,7 @@ export const s = {
     whiteSpace: "nowrap",
   } satisfies CSSProperties,
   muted: { color: "var(--text-muted)" } satisfies CSSProperties,
+  moreLine: { color: "var(--text-muted)", marginTop: 6 } satisfies CSSProperties,
   hint: {
     marginTop: 8,
     paddingTop: 6,

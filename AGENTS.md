@@ -21,6 +21,7 @@ Run each from inside its package (each has its own lockfile). Full detail is in 
 | Tests | `pnpm test` in `server/`, `client/`, `reviewer-core/` |
 | One test file | `pnpm exec vitest run <path>` |
 | Typecheck | `pnpm typecheck` in any package |
+| Lint (layer boundaries) | `pnpm lint` in `server/`, `client/` |
 | E2E (hermetic, own ports + DB) | `cd e2e && pnpm e2e:hermetic` |
 
 ## Before answering

@@ -15,13 +15,15 @@ import { usePrReviews } from "@/lib/hooks/reviews";
 
 export function PRRow({ pr, repoId }: { pr: PrMeta; repoId: string }) {
   const t = useTranslations("prReview");
-  // Same ["reviews", prId] cache as the PR detail page, so accept/dismiss there
-  // updates these counters without a reload. Latest run per agent, summed.
-  const { data: reviews } = usePrReviews(pr.id);
-  const findings = React.useMemo(
-    () => latestReviewPerAgent(reviews ?? []).flatMap((r) => r.findings),
-    [reviews],
-  );
+  // Counts come with the row (`severity_counts`, server-side rollup), so the
+  // list makes no per-row request. The findings behind them are fetched only
+  // when a popover first opens; it's the same ["reviews", prId] cache as the
+  // PR detail page.
+  const [wantFindings, setWantFindings] = React.useState(false);
+  const { data: reviews, isLoading: findingsLoading } = usePrReviews(pr.id, {
+    enabled: wantFindings,
+  });
+  const findings = latestReviewPerAgent(reviews ?? []).flatMap((r) => r.findings);
   const router = useRouter();
   const [h, setH] = React.useState(false);
   const st = STATUS_META[pr.status] ?? STATUS_META.needs_review!;
@@ -64,7 +66,12 @@ export function PRRow({ pr, repoId }: { pr: PrMeta; repoId: string }) {
         )}
       </div>
       <div>
-        <SeverityCounters findings={findings} />
+        <SeverityCounters
+          counts={pr.severity_counts}
+          findings={findings}
+          findingsLoading={wantFindings && findingsLoading}
+          onPopoverOpen={() => setWantFindings(true)}
+        />
       </div>
       <div>
         <Badge dot color={st.c} bg="transparent">

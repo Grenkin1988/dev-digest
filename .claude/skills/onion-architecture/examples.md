@@ -44,7 +44,7 @@ async listForRepo(workspaceId: string, repoId: string): Promise<PrMeta[]> {
 
 ## 2. Service locator → narrow constructor deps
 
-**Before** (`repos/service.ts:32-33`):
+**Before** (`repos/service.ts` up to 2026-11-24):
 ```ts
 constructor(private container: Container) {
   this.repo = new RepoRepository(container.db);
@@ -78,7 +78,7 @@ function instead of importing `PriceBook`, so `server/test/run-cost.test.ts` nee
 
 ## 4. Thin route (good, keep doing this)
 
-`repos/routes.ts:19-48`: it builds the service once, and every handler is
+`repos/routes.ts:19-49` and `pulls/routes.ts:24`: the service comes from the Container (built once there), and every handler is
 `getContext` → one service call → status.
 
 ## 5. External library behind a facade (good)
@@ -91,5 +91,5 @@ contract" lets callers fall back without try/catch.
 
 **Before**: `pulls/routes.ts:11` `import { usageForPulls } from '../reviews/repository/run.repo.js'`.
 **After**: add a `usageForPulls` method to the shared `ReviewRepository` facade
-(`reviews/repository.ts:26`, exposed as `container.reviewRepo`) and inject it as `runs`
-(example 1). The pulls module never reaches into `reviews/` internals.
+(`reviews/repository.ts:26`, exposed as `container.reviewRepo`) and inject it as the `usageForPulls`
+function in `PullsServiceDeps` (done: `platform/container.ts` `pullsService`). The pulls module never reaches into `reviews/` internals.

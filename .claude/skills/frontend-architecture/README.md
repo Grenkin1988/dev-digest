@@ -55,6 +55,7 @@ Bump it in the same change that edits the skill:
 
 ### Changelog
 
+- **1.1.0** (2026-11-24): DevDigest profile updated after the cleanup: key factories in `lib/hooks/keys.ts`, thin route files with `<Name>View`, explicit barrels, `@/` imports, `ConfirmDialog`, route `error.tsx`/`loading.tsx`, and ESLint (`client/eslint.config.mjs`) enforcing §9. The fixed items left "Known deviations".
 - **1.0.0** (2026-11-24): Initial version. Placement algorithm, layout, component splitting,
   constants, utils/lib, business-logic layering, data layer, Next.js App Router architecture,
   boundaries and barrel policy, review checklist. References: placement guide, Next.js,

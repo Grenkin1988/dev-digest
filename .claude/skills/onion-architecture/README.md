@@ -76,4 +76,5 @@ All links were opened on 2026-11-24.
 - C — [Atomic Object: restrict imports with dependency-cruiser](https://spin.atomicobject.com/dependency-cruiser-imports/) · [ArchUnitTS](https://github.com/LukasNiessen/ArchUnitTS)
 
 ## Changelog
+- **1.1.0** (2026-11-24): the §6 deviations were fixed in code (pulls/polling/settings/workspace routes, service DI, repo-intel split + Null Object, structural `toRepoDto`); §6 now lists only the accepted ones. DI reference documents the "every service built once in the Container" rule; ESLint (`server/eslint.config.mjs`) enforces the §5 import rules. Line references refreshed.
 - **1.0.0** (2026-11-24): first version.

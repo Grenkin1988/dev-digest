@@ -17,7 +17,6 @@ import { Container, type ContainerOverrides } from './platform/container.js';
 import { AppError } from './platform/errors.js';
 import { isAllowedHost, isAllowedOrigin } from './platform/local-only.js';
 import { modules } from './modules/index.js';
-import { ReviewService } from './modules/reviews/service.js';
 
 // Attach the DI container to every request/instance.
 declare module 'fastify' {
@@ -65,7 +64,7 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
 
-  const container = new Container(config, db, opts.overrides);
+  const container = new Container(config, db, opts.overrides, app.log);
   app.decorate('container', container);
 
   // Reap runs left 'running' by a previous (now-dead) process — otherwise they
@@ -79,7 +78,7 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
   // NOTE: assumes a SINGLE API instance per DB. With multiple replicas this
   // would need per-instance scoping / heartbeats (not this app's deployment).
   try {
-    const reaped = await new ReviewService(container).reapStaleRuns();
+    const reaped = await container.reviewService.reapStaleRuns();
     if (reaped > 0) app.log.info({ reaped }, 'reaped stale running agent_runs on boot');
   } catch (err) {
     app.log.warn({ err: (err as Error).message }, 'stale-run reaping failed (non-fatal)');
@@ -170,10 +169,17 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
       });
       return;
     }
+    // Anything else is unexpected. Fastify's own 4xx errors (bad JSON, body too
+    // large, …) keep their message; a 5xx never leaks internals (SQL, SDK or
+    // stack text) — it is logged in full and answered generically.
     app.log.error(err);
-    const e = err as { statusCode?: number; message?: string };
-    reply.status(e.statusCode ?? 500).send({
-      error: { code: 'internal_error', message: e.message ?? 'Internal error' },
+    const e = err as { statusCode?: number; message?: string; code?: string };
+    const status = e.statusCode && e.statusCode >= 400 && e.statusCode < 500 ? e.statusCode : 500;
+    reply.status(status).send({
+      error:
+        status < 500
+          ? { code: e.code ?? 'bad_request', message: e.message ?? 'Bad request' }
+          : { code: 'internal_error', message: 'Internal error' },
     });
   });
 

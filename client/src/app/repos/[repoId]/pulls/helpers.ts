@@ -19,3 +19,31 @@ export function relativeTime(iso: string | null | undefined): string {
   if (h < 24) return `${h}h`;
   return `${Math.round(h / 24)}d`;
 }
+
+/** Open PRs carry a derived review status; everything else is merged/closed. */
+const OPEN_STATUSES = new Set(["needs_review", "reviewed", "stale"]);
+
+/** PRs matching the status tab and the title/number query, sorted by update time. */
+export function filterPulls(
+  pulls: PrMeta[],
+  opts: { status: string; query: string; sort: string },
+): PrMeta[] {
+  const q = opts.query.trim().toLowerCase();
+  return pulls
+    .filter((p) => opts.status === "all" || p.status === opts.status)
+    .filter((p) => !q || p.title.toLowerCase().includes(q) || String(p.number).includes(q))
+    .slice()
+    .sort((a, b) => {
+      const ta = Date.parse(a.updated_at ?? "") || 0;
+      const tb = Date.parse(b.updated_at ?? "") || 0;
+      return opts.sort === "oldest" ? ta - tb : tb - ta;
+    });
+}
+
+/** Header summary counts: open PRs and those still needing a review. */
+export function pullCounts(pulls: PrMeta[]): { open: number; needsReview: number } {
+  return {
+    open: pulls.filter((p) => OPEN_STATUSES.has(p.status)).length,
+    needsReview: pulls.filter((p) => p.status === "needs_review").length,
+  };
+}

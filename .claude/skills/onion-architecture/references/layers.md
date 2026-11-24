@@ -61,5 +61,5 @@ for it: the app should run with mock adapters, "without either a UI or a databas
   `@devdigest/shared`.
 - **Cross-module use**: modules don't deep-import each other's repositories. Shared
   repositories are exposed by the `Container` (`container.agentsRepo`, `container.reviewRepo`;
-  see the comment at `container.ts:70`). Shared capabilities are exposed as facades
+  see the comment at `container.ts:80`). Shared capabilities are exposed as facades
   (`container.repoIntel`).

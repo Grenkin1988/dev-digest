@@ -14,7 +14,8 @@ answer it — then read code.
 - Unit only: `pnpm exec vitest run --exclude '**/*.it.test.ts'` · integration only: `pnpm exec vitest run .it.test`
 - One file: `pnpm exec vitest run test/run-cost.test.ts`
 - `pnpm typecheck` (don't use `npx tsc`, see `INSIGHTS.md`).
-- On Windows, 8 tests in `git-adapter-safety` / `indexer-pipeline` fail even on a clean tree (see `INSIGHTS.md`).
+- `pnpm lint`: ESLint, including the onion-architecture import rules per ring (`eslint.config.mjs`). Run it via pnpm, not `npx eslint`.
+- The whole suite, including `git-adapter-safety` / `indexer-pipeline`, passes on Windows as well.
 
 ## Conventions (not obvious from code)
 - A new feature module is registered in `src/modules/index.ts` (one import + one entry).

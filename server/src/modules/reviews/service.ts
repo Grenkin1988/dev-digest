@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import type { Container } from '../../platform/container.js';
+import type { ReviewDeps } from './deps.js';
 import type { FindingActionKind, RunEventKind, RunTrace } from '@devdigest/shared';
 import { AppError, NotFoundError } from '../../platform/errors.js';
 import type { AgentRow } from '../../db/rows.js';
-import { ReviewRepository } from './repository.js';
+import type { ReviewRepository } from './repository.js';
 import { type ReviewDto, type ReviewDtoFinding } from './helpers.js';
 import { ReviewRunExecutor, type Logger } from './run-executor.js';
 import { actOnFinding as actOnFindingImpl } from './findings.js';
@@ -21,21 +21,23 @@ export type { ReviewDto, ReviewDtoFinding } from './helpers.js';
  *        → llm.completeStructured({ schema: Review }) (single-pass)
  *        → groundFindings(...) (citation gate — drops findings off the diff)
  *        → persist reviews + kept findings (+ grounding summary)
- *   while streaming RunEvents over container.runBus, and on completion writing
+ *   while streaming RunEvents over the injected runBus, and on completion writing
  *   the whole log as ONE RunTrace doc + an agent_runs row.
  *
  * Also: the finding accept/dismiss actions. The bulky run execution lives in
  * run-executor; this class keeps the public method surface.
  */
 export class ReviewService {
-  private repo: ReviewRepository;
-  private agents: Container['agentsRepo'];
-  private executor: ReviewRunExecutor;
+  private readonly repo: ReviewRepository;
+  private readonly agents: ReviewDeps['agents'];
+  private readonly executor: ReviewRunExecutor;
+  private readonly estimateCost: CostEstimator;
 
-  constructor(private container: Container) {
-    this.repo = new ReviewRepository(container.db);
-    this.agents = container.agentsRepo;
-    this.executor = new ReviewRunExecutor(container, this.repo, this.agents);
+  constructor(private readonly deps: ReviewDeps) {
+    this.repo = deps.repo;
+    this.agents = deps.agents;
+    this.estimateCost = deps.estimate;
+    this.executor = new ReviewRunExecutor(deps);
   }
 
   // ===========================================================================
@@ -86,9 +88,9 @@ export class ReviewService {
    */
   async cancelRun(runId: string): Promise<void> {
     this.publish(runId, 'info', 'Cancellation requested — stopping…');
-    this.container.runBus.cancel(runId);
+    this.deps.runBus.cancel(runId);
     await this.repo.cancelRunIfRunning(runId);
-    this.container.runBus.complete(runId);
+    this.deps.runBus.complete(runId);
   }
 
   /** Reap runs left 'running' by a previous (now-dead) process. Called on boot. */
@@ -144,7 +146,7 @@ export class ReviewService {
   }
 
   private publish(runId: string, kind: RunEventKind, msg: string, data?: unknown) {
-    return this.container.runBus.publish(runId, kind, msg, data);
+    return this.deps.runBus.publish(runId, kind, msg, data);
   }
 
   // ===========================================================================
@@ -190,8 +192,4 @@ export class ReviewService {
     const cost = usage ? runCost(usage, this.estimateCost) : null;
     return { ...trace, stats: { ...trace.stats, cost_usd: cost } };
   }
-
-  /** Live OpenRouter prices with the static table as fallback; never calls a model. */
-  private estimateCost: CostEstimator = (model, tokensIn, tokensOut) =>
-    this.container.priceBook.estimate(model, tokensIn, tokensOut);
 }

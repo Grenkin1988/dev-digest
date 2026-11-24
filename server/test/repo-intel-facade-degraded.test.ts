@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { RepoIntelService } from '../src/modules/repo-intel/service.js';
-import type { RepoBasics } from '../src/modules/repo-intel/repository.js';
+import type { RepoBasics, RepoIntelRepository } from '../src/modules/repo-intel/repository.js';
 import type { IndexState } from '../src/modules/repo-intel/types.js';
 
 /**
@@ -20,24 +20,23 @@ function buildDegradedService(opts: {
   basics?: RepoBasics | null;
   indexStateRow?: IndexState | null;
 }): RepoIntelService {
-  const container = {
-    config: { repoIntelEnabled: opts.flag },
-    db: {} as never,
-    // codeIndex is reached by getBlastRadius; we stub minimal behaviour.
-    codeIndex: {
-      symbols: async () => [],
-      references: async () => [],
-    } as never,
-  } as never;
-  const svc = new RepoIntelService(container);
-  (svc as unknown as { repo: Record<string, unknown> }).repo = {
+  const repo = {
     getRepoBasics: async () => opts.basics ?? null,
     tryGetIndexState: async () => opts.indexStateRow ?? null,
     getCachedSymbols: async () => [],
     getCachedSymbolsForFiles: async () => [],
     getCachedReferencesTo: async () => [],
-  };
-  return svc;
+  } as unknown as RepoIntelRepository;
+  return new RepoIntelService({
+    enabled: opts.flag,
+    repo,
+    // codeIndex is reached by getBlastRadius; we stub minimal behaviour.
+    codeIndex: { symbols: async () => [], references: async () => [] } as never,
+    git: {} as never,
+    depgraph: {} as never,
+    tokenizer: {} as never,
+    jobs: { register: () => {}, enqueue: async () => ({ id: 'j', done: Promise.resolve() }) },
+  });
 }
 
 describe('RepoIntel facade — degraded contract (flag off)', () => {

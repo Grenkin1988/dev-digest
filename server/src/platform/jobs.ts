@@ -27,7 +27,13 @@ export interface EnqueuedJob {
   done: Promise<void>;
 }
 
-export class JobRunner {
+/** The job-queue port services depend on (JobRunner is the implementation). */
+export interface JobQueue {
+  register(kind: string, handler: JobHandler): void;
+  enqueue(workspaceId: string, kind: string, payload: unknown): Promise<EnqueuedJob>;
+}
+
+export class JobRunner implements JobQueue {
   private queue: PQueue;
   private handlers = new Map<string, JobHandler>();
   private timeoutMs: number;

@@ -27,6 +27,16 @@ import { AgentsRepository } from '../modules/agents/repository.js';
 import { ReviewRepository } from '../modules/reviews/repository.js';
 import type { RepoIntel } from '../modules/repo-intel/types.js';
 import { RepoIntelService } from '../modules/repo-intel/service.js';
+import { RepoIntelRepository } from '../modules/repo-intel/repository.js';
+import { RepoRepository } from '../modules/repos/repository.js';
+import { RepoService } from '../modules/repos/service.js';
+import { AgentsService } from '../modules/agents/service.js';
+import { ReviewService } from '../modules/reviews/service.js';
+import { PullsRepository } from '../modules/pulls/repository.js';
+import { PullsService, type PullsLogger } from '../modules/pulls/service.js';
+import { SettingsRepository } from '../modules/settings/repository.js';
+import { SettingsService } from '../modules/settings/service.js';
+import type { CostEstimator } from '../modules/reviews/cost.js';
 import { type DepGraph, DepCruiseGraph } from '../adapters/depgraph/index.js';
 import { type Tokenizer, TiktokenTokenizer } from '../adapters/tokenizer/index.js';
 
@@ -72,18 +82,94 @@ export class Container {
   // `container.agentsRepo` instead of reaching into another module's folder.
   private _agentsRepo?: AgentsRepository;
   private _reviewRepo?: ReviewRepository;
+  private _repoRepo?: RepoRepository;
   private _repoIntel?: RepoIntel;
+  private _repoIntelService?: RepoIntelService;
   private _depgraph?: DepGraph;
   private _tokenizer?: Tokenizer;
   private _priceBook?: PriceBook;
 
-  constructor(config: AppConfig, db: Db, private overrides: ContainerOverrides = {}) {
+  // Application services — built ONCE here (the composition root) with narrow
+  // dependencies; routes, job handlers and boot code read them from here.
+  private _reposService?: RepoService;
+  private _agentsService?: AgentsService;
+  private _reviewService?: ReviewService;
+  private _pullsService?: PullsService;
+  private _settingsService?: SettingsService;
+
+  /** App logger (Fastify's pino); a no-op until `buildApp` attaches one. */
+  readonly log: PullsLogger;
+
+  constructor(
+    config: AppConfig,
+    db: Db,
+    private overrides: ContainerOverrides = {},
+    log?: PullsLogger,
+  ) {
     this.config = config;
     this.db = db;
     this.secrets = overrides.secrets ?? new LocalSecretsProvider(config.secretsPath);
     this.auth = overrides.auth ?? new LocalNoAuthProvider(db);
     this.runBus = runBus;
     this.jobs = new JobRunner(db);
+    this.log = log ?? { warn: () => {} };
+  }
+
+  /** Live OpenRouter prices with the static table as fallback; never calls a model. */
+  readonly estimateCost: CostEstimator = (model, tokensIn, tokensOut) =>
+    this.priceBook.estimate(model, tokensIn, tokensOut);
+
+  get repoRepo(): RepoRepository {
+    return (this._repoRepo ??= new RepoRepository(this.db));
+  }
+
+  get reposService(): RepoService {
+    return (this._reposService ??= new RepoService({
+      repo: this.repoRepo,
+      jobs: this.jobs,
+      git: this.git,
+    }));
+  }
+
+  get agentsService(): AgentsService {
+    return (this._agentsService ??= new AgentsService({
+      repo: this.agentsRepo,
+      llm: (provider) => this.llm(provider),
+    }));
+  }
+
+  get reviewService(): ReviewService {
+    return (this._reviewService ??= new ReviewService({
+      repo: this.reviewRepo,
+      agents: this.agentsRepo,
+      runBus: this.runBus,
+      git: this.git,
+      llm: (provider) => this.llm(provider),
+      repoIntel: this.repoIntel,
+      estimate: this.estimateCost,
+    }));
+  }
+
+  get pullsService(): PullsService {
+    return (this._pullsService ??= new PullsService({
+      repo: new PullsRepository(this.db),
+      usageForPulls: (prIds, estimate) => this.reviewRepo.usageForPulls(prIds, estimate),
+      github: () => this.github(),
+      estimate: this.estimateCost,
+      log: this.log,
+    }));
+  }
+
+  get settingsService(): SettingsService {
+    return (this._settingsService ??= new SettingsService({
+      repo: new SettingsRepository(this.db),
+      secrets: this.secrets,
+      github: () => this.github(),
+      githubWithToken: (token) => this.githubWithToken(token),
+      llm: (provider) => this.llm(provider),
+      llmWithKey: (provider, key) => this.llmWithKey(provider, key),
+      invalidateSecretCaches: () => this.invalidateSecretCaches(),
+    }));
   }
 
   get git(): GitClient {
@@ -115,8 +201,24 @@ export class Container {
    */
   get repoIntel(): RepoIntel {
     if (this.overrides.repoIntel) return this.overrides.repoIntel;
-    this._repoIntel ??= new RepoIntelService(this);
-    return this._repoIntel;
+    return (this._repoIntel ??= this.repoIntelService);
+  }
+
+  /**
+   * The concrete repo-intel service. Always real (even when tests override the
+   * `repoIntel` facade), because its indexer owns the INDEX / REFRESH / RESYNC
+   * job handlers that `repos` enqueues.
+   */
+  get repoIntelService(): RepoIntelService {
+    return (this._repoIntelService ??= new RepoIntelService({
+      repo: new RepoIntelRepository(this.db),
+      git: this.git,
+      codeIndex: this.codeIndex,
+      depgraph: this.depgraph,
+      tokenizer: this.tokenizer,
+      jobs: this.jobs,
+      enabled: this.config.repoIntelEnabled,
+    }));
   }
 
   /** Import-graph builder (dependency-cruiser). T3 indexer pipeline only. */

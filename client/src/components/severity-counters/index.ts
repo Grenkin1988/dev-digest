@@ -4,6 +4,7 @@ export {
   SEVERITY_LEVELS,
   countBySeverity,
   topFindings,
+  findingLocation,
   latestReviewPerAgent,
   type CounterSeverity,
   type SeverityCounts,

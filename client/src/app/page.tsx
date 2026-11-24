@@ -3,45 +3,51 @@
 
 import React from "react";
 import { useRouter } from "next/navigation";
-import { useRepos } from "../lib/hooks";
-import { AppShell } from "../components/app-shell";
-import { PageContainer } from "../components/page-shell";
+import { useTranslations } from "next-intl";
 import { EmptyState, Button, Skeleton } from "@devdigest/ui";
+import { useRepos } from "@/lib/hooks/core";
+import { AppShell } from "@/components/app-shell";
+import { PageContainer } from "@/components/page-shell";
+import { s } from "./styles";
 
 export default function HomePage() {
+  const t = useTranslations("shell.home");
   const router = useRouter();
-  const { data: repos, isLoading, isError } = useRepos();
+  const { data: repos, isLoading } = useRepos();
+  const first = repos?.[0];
 
+  // Navigation is a side effect of the loaded data, so it runs after render.
   React.useEffect(() => {
-    if (repos && repos.length > 0) {
-      router.replace(`/repos/${repos[0]!.id}/pulls`);
-    }
-  }, [repos, router]);
+    if (first) router.replace(`/repos/${first.id}/pulls`);
+  }, [first, router]);
 
   return (
-    <AppShell crumb={[{ label: "DevDigest" }]}>
-      <PageContainer title="Welcome to DevDigest" subtitle="Local-first AI PR review">
-        {isLoading ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 12, maxWidth: 480 }}>
+    <AppShell crumb={[{ label: t("crumb") }]}>
+      <PageContainer title={t("title")} subtitle={t("subtitle")}>
+        {isLoading || first ? (
+          // Loading, or about to redirect: a skeleton instead of a flash of content.
+          <div style={s.skeleton} aria-busy="true">
             <Skeleton height={20} width={240} />
             <Skeleton height={48} />
             <Skeleton height={48} />
+            {first && (
+              <div>
+                <p style={s.redirecting}>{t("redirecting")}</p>
+                <Button kind="primary" onClick={() => router.push(`/repos/${first.id}/pulls`)}>
+                  {t("open", { name: first.full_name })}
+                </Button>
+              </div>
+            )}
           </div>
-        ) : isError || !repos || repos.length === 0 ? (
+        ) : (
+          // Not loading and no first repo: none yet, or the list failed to load.
           <EmptyState
             icon="GitBranch"
-            title="No repositories yet"
-            body="Add a repository to start reviewing pull requests. Set your API keys once in Settings → API Keys."
-            cta="Add repository"
+            title={t("emptyTitle")}
+            body={t("emptyBody")}
+            cta={t("emptyCta")}
             onCta={() => router.push("/onboarding")}
           />
-        ) : (
-          <div>
-            <p style={{ color: "var(--text-secondary)", marginBottom: 14 }}>Taking you to your repository…</p>
-            <Button kind="primary" onClick={() => router.push(`/repos/${repos[0]!.id}/pulls`)}>
-              Open {repos[0]!.full_name}
-            </Button>
-          </div>
         )}
       </PageContainer>
     </AppShell>

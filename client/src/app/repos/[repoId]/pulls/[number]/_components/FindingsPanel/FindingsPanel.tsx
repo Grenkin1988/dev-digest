@@ -8,8 +8,8 @@ import { Toggle, EmptyState } from "@devdigest/ui";
 import type { FindingRecord } from "@devdigest/shared";
 import { SeverityCounters, type CounterSeverity } from "@/components/severity-counters";
 import { FindingCard } from "../FindingCard";
-import { useFindingAction } from "../../../../../../../lib/hooks/reviews";
-import { KEY_TO_ACTION } from "./constants";
+import { useFindingAction } from "@/lib/hooks/reviews";
+import { useFindingShortcuts } from "./useFindingShortcuts";
 import { visibleFindings } from "./helpers";
 import { s } from "./styles";
 
@@ -43,19 +43,12 @@ export function FindingsPanel({
   }, []);
 
   // j/k navigation + a/d shortcuts on the focused finding (keyboard).
-  React.useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA") return;
-      if (e.key === "j") setFocusIdx((i) => Math.min(i + 1, shown.length - 1));
-      else if (e.key === "k") setFocusIdx((i) => Math.max(i - 1, 0));
-      else if (KEY_TO_ACTION[e.key] && shown[focusIdx]) {
-        action.mutate({ findingId: shown[focusIdx]!.id, action: KEY_TO_ACTION[e.key]!, prId });
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [shown, focusIdx, action, prId]);
+  useFindingShortcuts({
+    items: shown,
+    focusIdx,
+    setFocusIdx,
+    onAction: (f, kind) => action.mutate({ findingId: f.id, action: kind, prId }),
+  });
 
   return (
     <div>

@@ -33,11 +33,13 @@
 3. **Lazy getters are for adapters that need secrets or are expensive** (`git`, `github`, LLM
    providers). Add a getter plus a `ContainerOverrides` field for every new adapter.
 4. **Cross-module repositories** are exposed by the `Container` (`agentsRepo`, `reviewRepo`;
-   see the comment at `container.ts:70`). Never deep-import `../other-module/repository.js`
-   from a service or route.
-5. **Migrating an existing `constructor(container)` service** (`repos/service.ts:32`,
-   `agents/service.ts:54`, `reviews/service.ts:35`, `repo-intel/service.ts:104`): do it only
-   while changing that service. Keep the public method surface, and move the `new Repository`
-   call to the plugin or `Container`. `ReviewRunExecutor` (`reviews/run-executor.ts:44`)
-   already receives its repositories by constructor. That's the direction to go, minus the
-   `container` argument.
+   see the comment at `container.ts:80`). Never deep-import `../other-module/repository.js`
+   from a service or route. When a service needs another module's data, inject a function
+   (`PullsServiceDeps.usageForPulls`, wired from `reviewRepo` in the Container) rather than
+   the repository type.
+5. **Every service is built once in the `Container`** (`reposService`, `agentsService`,
+   `reviewService`, `pullsService`, `settingsService`, `repoIntelService`) from a narrow
+   `XServiceDeps` interface declared next to the service (`reviews/deps.ts`,
+   `repo-intel/deps.ts`, `pulls/service.ts` `PullsServiceDeps`). Routes, job handlers and boot
+   code read `container.<x>Service`; they never `new` a service, so a job handler and a route
+   share one instance. Tests construct the service directly with fakes for those deps.

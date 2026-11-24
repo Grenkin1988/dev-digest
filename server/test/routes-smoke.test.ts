@@ -64,4 +64,15 @@ describe('routes (no DB)', () => {
     expect(res.json().error.code).toBe('validation_error');
     await app.close();
   });
+
+  it('never leaks an unexpected error message in a 5xx body', async () => {
+    const app = await buildApp({ config });
+    app.get('/__boom', async () => {
+      throw new Error('relation "secret_table" does not exist');
+    });
+    const res = await app.inject({ method: 'GET', url: '/__boom' });
+    expect(res.statusCode).toBe(500);
+    expect(res.json()).toEqual({ error: { code: 'internal_error', message: 'Internal error' } });
+    await app.close();
+  });
 });

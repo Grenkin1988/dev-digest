@@ -2,13 +2,13 @@
 name: onion-architecture
 description: "Onion Architecture (ports & adapters, dependency rule) for DevDigest server modules: Fastify routes, services, Drizzle repositories, Zod contracts, the DI Container, adapters, job handlers and reviewer-core. Use whenever you create or change a module in server/src/modules, add a route, service, use case, repository, query, adapter, port or job handler, decide where server code belongs, wire a dependency, or review a backend PR for layering, even if the user doesn't say 'architecture' (e.g. 'add an endpoint', 'where should this query go', 'new module', 'call GitHub from X', 'this route is too big'). Not for Fastify API details, Drizzle query syntax or Zod schema syntax: use fastify-best-practices / drizzle-orm-patterns / zod for those."
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
   tags: architecture, onion, hexagonal, clean-architecture, fastify, drizzle, zod, dependency-injection, backend
 ---
 
 # Onion Architecture for server modules
 
-How code in `server/src/modules/*` is layered, and why. Version 1.0.0. Sources are in
+How code in `server/src/modules/*` is layered, and why. Version 1.1.0. Sources are in
 [README.md](README.md).
 
 One rule underlies everything: **source dependencies point inward only.** Inner rings
@@ -62,7 +62,7 @@ are in [references/layers.md](references/layers.md).
 
 - **Fastify** ([fastify.md](references/fastify.md)): a route is a thin driving adapter, built like `repos/routes.ts:19`.
   Validate with the Zod contract in `schema`, then `getContext`, one service call, set the status. No SQL, no business branching, no
-  `try/catch` that builds error bodies: throw `AppError` and let `app.ts:130` (`setErrorHandler`) map it.
+  `try/catch` that builds error bodies: throw `AppError` and let `app.ts:129` (`setErrorHandler`) map it.
 - **Zod** ([zod-contracts.md](references/zod-contracts.md)): `src/vendor/shared` contracts are the boundary DTOs, request
   and response alike. Parse once at the edge ("parse, don't validate"). Inner code takes typed values and never re-parses.
 - **Drizzle** ([drizzle.md](references/drizzle.md)): only repositories import `drizzle-orm` or `db/schema`. They return
@@ -77,7 +77,7 @@ are in [references/layers.md](references/layers.md).
 - **reviewer-core** is a pure domain library: no DB, GitHub or filesystem, and only the injected `LLMProvider` for I/O. Server
   application code calls it. It never imports server code.
 - **Jobs / SSE** are driving adapters, like routes. A job handler deserializes its payload and delegates:
-  `repos/service.ts:41` (`registerCloneJobHandler`) → `:47` (`runCloneJob`).
+  `repos/service.ts:47` (`registerCloneJobHandler`) → `:53` (`runCloneJob`).
 - **Testing** ([testing.md](references/testing.md)): domain gets plain unit tests (no mocks). Application gets fakes for its
   ports. Repositories get `*.it.test.ts` on Testcontainers. Routes get `app.inject` smoke tests with `ContainerOverrides`.
 
@@ -114,16 +114,23 @@ simple CRUD.)
 
 ## 6. Known deviations in the current code (don't copy them)
 
-- `pulls/routes.ts` queries `container.db` directly (e.g. `:34`, `:86`, `:127`, `:206`) and
-  imports `usageForPulls` from another module's repository (`:11`). `polling/routes.ts:22`,
-  `:32` and `:60` do the same.
-- Services take the whole `Container` and construct their own repository:
-  `repos/service.ts:32-33`, `agents/service.ts:54-55`, `reviews/service.ts:35-36`,
-  `repo-intel/service.ts:104-105`.
-- `repos/helpers.ts:2` imports `db/schema` so `toRepoDto` (`:109`) can type its argument. It's
-  type-only in effect, but it couples the domain ring to the table. New mappers take a
-  structural type, or live in the repository.
+Fixed on 2026-11-24 (routes, services and repositories now follow the rings, and
+`pnpm lint` enforces it, see `server/eslint.config.mjs`): routes no longer touch
+`container.db`, services get narrow constructor deps built once in `platform/container.ts`,
+and `repos/helpers.ts` maps from a structural `RepoRowLike`. Reference implementations:
+`pulls/{repository,service,helpers,routes}.ts`, `settings/{repository,service}.ts`,
+`reviews/deps.ts` (`ReviewDeps`), `repo-intel/deps.ts` (`RepoIntelDeps`).
+
+Still in place, and accepted:
+
 - `AppError` (`platform/errors.ts:7`) carries an HTTP `statusCode`. This is accepted: it's
-  our one domain error type, and the transport mapping stays centralized in `app.ts:130`.
+  our one domain error type, and the transport mapping stays centralized in `app.ts:129`
+  (`setErrorHandler`; unknown 5xx errors are answered generically and only logged).
+- `OpenRouterProvider` (`reviewer-core/src/llm/openrouter.ts:1`) imports the `openai` SDK
+  inside the "pure" engine. It stays: the CI agent-runner consumes reviewer-core without the
+  server's adapters. Server code still builds it only in the composition root
+  (`platform/container.ts`).
+- `settings/feature-models.ts` takes the `Container` and queries `container.db`. It has no
+  callers yet (later lessons). Give it a `SettingsRepository` method when it gets one.
 
 Worked before/after examples of each are in [examples.md](examples.md).

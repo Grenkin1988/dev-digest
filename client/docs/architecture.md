@@ -31,17 +31,19 @@ flowchart LR
 
 - `apiFetch` (`src/lib/api.ts:21`) prefixes `API_BASE` (`NEXT_PUBLIC_API_BASE`, default `http://localhost:3001`). If the API can't be reached it throws an `ApiError` with a readable message.
 - Hooks are grouped by area: `core.ts` (settings, repos, pulls), `agents.ts`, `reviews.ts`, `trace.ts`, `repo-intel.ts`.
-- Key query keys:
-  - `["pulls", repoId]`: the list (`usePulls`, `src/lib/hooks/core.ts:102`)
-  - `["pull", prId]`: the detail, including the total and latest-round cost (`usePullDetail`, `core.ts:114`)
-  - `["reviews", prId]`: reviews with findings, the only source for severity counters
-- When a run finishes, the PR detail page invalidates `["pull", prId]` so the Overview cost refreshes.
+- All query keys come from the factories in `src/lib/hooks/keys.ts`, and their values are pinned by `keys.test.ts`. The main ones:
+  - `pullKeys.list(repoId)` = `["pulls", repoId]`: the list (`usePulls`, `src/lib/hooks/core.ts:103`). Rows carry the server's `severity_counts`.
+  - `pullKeys.detail(prId)` = `["pull", prId]`: the detail, including the total and latest-round cost (`usePullDetail`, `core.ts:116`). `usePullByNumber` (`core.ts:130`) loads the detail by the route's PR number in one request and seeds this key.
+  - `reviewKeys.forPr(prId)` = `["reviews", prId]`: reviews with findings.
+- When a run settles, `useInvalidateAfterRun(prId).all` (`src/lib/hooks/reviews.ts:68`) refreshes in-flight runs, run history, reviews, the PR detail (Overview cost) and every PR list (severity counters).
+- Route files are thin. Each `page.tsx` reads params and renders a `_components/<Name>View`. `error.tsx`, `not-found.tsx`, `global-error.tsx` and per-segment `loading.tsx` live under `src/app/`.
 
 ## Shared components
 
-- `SeverityCounters` (`src/components/severity-counters/SeverityCounters.tsx:40`):
+- `SeverityCounters` (`src/components/severity-counters/SeverityCounters.tsx:41`):
   - one component for the run card (acts as a filter; click again to clear), the Timeline, and the PR list (shows a findings preview on hover)
-  - counts are derived from the `["reviews", prId]` cache and never fetched
+  - presentational: it takes `counts` (precomputed, e.g. the PR list's `severity_counts`) or derives them from `findings`, and never fetches itself; the PR list's `PRRow` loads the findings for the popover lazily on first hover
+- `ConfirmDialog` / `useConfirm()` (`src/components/confirm-dialog/`): the replacement for `window.confirm`, with focus trap, Escape and focus restore
 - `RunCostBadge` (`src/components/run-cost-badge/RunCostBadge.tsx:38`):
   - variants `compact` (PR list), `inline` (timeline) and `detailed` (Overview)
   - "no data" renders "—", never `$0`

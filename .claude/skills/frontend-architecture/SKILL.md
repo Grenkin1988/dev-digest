@@ -2,13 +2,13 @@
 name: frontend-architecture
 description: "Frontend UI architecture and code organization for React + Next.js (App Router) apps: where components, route UI, constants, helpers/utils, lib clients, hooks, business logic and data-access code live; how to split a component into a folder; import direction and boundaries; barrel-file policy; when to promote colocated code to shared. Use whenever you create a new component, screen, route, hook, helper or constants file, decide where a file belongs, split a large component, move logic out of JSX, or review a PR for structure and placement, even if the user doesn't say 'architecture' (e.g. 'where should this go', 'folder structure', 'utils vs helpers', 'where to put business logic', 'this page is too big'). Not for render performance, hook correctness or Next.js caching: use react-best-practices / next-best-practices for those."
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
   tags: react, nextjs, architecture, folder-structure, code-organization, frontend
 ---
 
 # Frontend UI Architecture
 
-Where code lives in a React + Next.js App Router app, and why. Version 1.0.0. Sources and
+Where code lives in a React + Next.js App Router app, and why. Version 1.1.0. Sources and
 changelog are in [README.md](README.md).
 
 The aim is a codebase where a developer can guess where a file is before searching. Each rule

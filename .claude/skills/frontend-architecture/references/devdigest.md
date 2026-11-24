@@ -4,7 +4,7 @@ How the general rules in `SKILL.md` map onto `client/src` (Next.js 15 App Router
 TanStack Query, next-intl). Read this before creating or moving files in `client/`. Inside this
 repo, where this profile and `SKILL.md` differ, the profile wins.
 
-Verified against the code on 2026-11-24 (skill v1.0.0). If a path below no longer exists,
+Verified against the code on 2026-11-24 (skill v1.1.0). If a path below no longer exists,
 trust the code and update this file.
 
 ## Layout mapping
@@ -53,11 +53,13 @@ AgentCard/
 
 - Hooks live in `src/lib/hooks/<domain>.ts` and are marked `"use client"`. Components and pages
   import a hook and never call `apiFetch` or `fetch` directly.
-- Query keys are currently inline arrays (`["agents"]`, `["agent", id]`, `["reviews", prId]`).
-  When adding several keys to a domain, or when invalidation crosses screens, introduce a
-  per-domain key factory in that hook file (SKILL.md §7) instead of more literals. Keep existing
-  keys stable: other screens invalidate them (see `client/INSIGHTS.md` on `["pull", prId]` and
-  `["reviews", prId]`).
+- Every query key comes from the factories in `src/lib/hooks/keys.ts` (`pullKeys`,
+  `reviewKeys`, `agentKeys`, `repoKeys`, `settingsKeys`). There are no inline key arrays outside
+  that file. They live in one file because invalidation crosses domains (a finished run touches
+  reviews, runs, the PR and the PR list). The key VALUES are pinned by `keys.test.ts`, because
+  other screens invalidate them (see `client/INSIGHTS.md` on `["pull", prId]` and
+  `["reviews", prId]`). Cross-query invalidation after a run goes through
+  `useInvalidateAfterRun(prId)` (`lib/hooks/reviews.ts`).
 - Next.js is **UI only** here: the backend is the Fastify API (`NEXT_PUBLIC_API_BASE`, default
   `http://localhost:3001`). There are **no Server Actions, no Route Handlers, no `server-only`
   DAL**. Don't add them for data that the Fastify API owns. That would create a second source
@@ -74,15 +76,20 @@ AgentCard/
 
 ## Known deviations (accepted, don't copy into new code)
 
-- **`src/lib/hooks/index.ts` uses `export *`** over all domain hook files. It's kept for
-  existing imports. New code imports from the domain file (`@/lib/hooks/agents`), and new
-  barrels must use explicit named exports (SKILL.md §9).
-- **Thick client pages** such as `src/app/agents/[id]/page.tsx` and
-  `src/app/repos/[repoId]/pulls/page.tsx` hold hooks, effects and JSX. When you substantially
-  change one, move the body into `_components/<Name>View` as `agents/page.tsx` does.
-- **Relative `../../../` imports** exist in older pages. Use `@/` in new and touched code.
 - **`src/components/app-shell` calls data hooks.** It's app chrome (navigation, command
   palette), not reusable UI, so it may depend on `lib/hooks`. Other shared components in
-  `src/components/` take data through props.
-- **No lint enforcement of boundaries yet** (`client/` has no ESLint config). The rules are
-  enforced by review. If lint is added, start from `references/enforcement.md`.
+  `src/components/` take data through props (e.g. `SeverityCounters` gets `counts`, `findings`
+  and an `onPopoverOpen` callback; the route-level `PRRow` does the lazy fetch).
+- **`src/lib/hooks/index.ts` still exists** as an explicit-export entry for older imports.
+  New code imports from the domain file (`@/lib/hooks/agents`).
+- **Lint warnings left to pay down** (`pnpm lint` passes with 0 errors): `jsx-a11y` on
+  clickable `<div>`s (PR rows, drawers, diff file headers) and `react-hooks/exhaustive-deps`.
+  Fix them when you touch the file, with a real `<button>` or a keyboard handler.
+
+Resolved on 2026-11-24 (don't reintroduce): `export *` barrels, thick route files (all routes
+now render a `_components/<Name>View`), `../../../` imports (use `@/`), `window.confirm` (use
+`useConfirm()` from `@/components/confirm-dialog`), missing `error.tsx` / `not-found.tsx` /
+`loading.tsx`, the effect-based form reset in `ConfigTab` (the view keys the editor by agent
+id), and a `/reviews` request per PR-list row (the list now carries `severity_counts`).
+ESLint (`client/eslint.config.mjs`) enforces the §9 rules: `components/` and `lib/` never
+import `app/`, there is no `export *`, and nothing reaches into another component's internals.

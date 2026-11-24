@@ -83,6 +83,11 @@ export class ReviewRepository {
     return runRepo.listRunsForPull(this.db, workspaceId, prId, estimate);
   }
 
+  /** Usage (cost + tokens) per PR: all completed runs + the latest round. */
+  usageForPulls(prIds: string[], estimate: CostEstimator): Promise<runRepo.PrUsage> {
+    return runRepo.usageForPulls(this.db, prIds, estimate);
+  }
+
   getRunUsage(runId: string): Promise<RunUsageRow | undefined> {
     return runRepo.getRunUsage(this.db, runId);
   }

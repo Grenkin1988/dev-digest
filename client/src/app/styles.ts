@@ -1,0 +1,7 @@
+import type { CSSProperties } from "react";
+
+/** Styles for the app-root screens (home, error, not-found). */
+export const s = {
+  skeleton: { display: "flex", flexDirection: "column", gap: 12, maxWidth: 480 } satisfies CSSProperties,
+  redirecting: { color: "var(--text-secondary)", marginBottom: 14 } satisfies CSSProperties,
+} as const;

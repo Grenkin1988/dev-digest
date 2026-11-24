@@ -17,7 +17,7 @@ into one application call and translate the result (or an `AppError`) back into 
 4. **No persistence or SDK calls in routes**: no `container.db`, `drizzle-orm`, `db/schema`,
    repository or adapter imports.
 5. **Errors**: throw `AppError` / `NotFoundError` from inner rings. The global handler
-   (`app.ts:130`) maps Zod validation → 422, `AppError` → its status, and response
+   (`app.ts:129`) maps Zod validation → 422, `AppError` → its status, and response
    serialization errors → a generic 500. Routes don't catch and reshape.
 6. **Response schemas** use the same `vendor/shared` contracts, so serialization enforces the
    boundary shape on the way out, too.

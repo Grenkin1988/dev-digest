@@ -13,6 +13,7 @@ answer it — then read code.
 - `pnpm typecheck`: run it as well as tests. It catches contract mismatches that vitest
   doesn't, e.g. invalid `Severity` values in fixtures.
 - `pnpm build`: production build.
+- `pnpm lint`: ESLint (Next rules plus the frontend-architecture boundaries in `eslint.config.mjs`).
 
 ## Conventions (not obvious from code)
 - Data only through the TanStack Query hooks in `src/lib/hooks/*` over `src/lib/api.ts`.

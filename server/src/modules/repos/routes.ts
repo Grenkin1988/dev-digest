@@ -1,9 +1,9 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
-import { RepoInput } from '@devdigest/shared';
+import { z } from 'zod';
+import { Repo, RepoInput } from '@devdigest/shared';
 import { getContext } from '../_shared/context.js';
 import { IdParams } from '../_shared/schemas.js';
-import { RepoService } from './service.js';
 
 /**
  * F1 — repos module. Transport layer only: parses requests, maps status
@@ -18,19 +18,19 @@ import { RepoService } from './service.js';
  */
 export default async function reposRoutes(appBase: FastifyInstance) {
   const app = appBase.withTypeProvider<ZodTypeProvider>();
-  const service = new RepoService(app.container);
+  const service = app.container.reposService;
 
   // Register the clone job handler once.
   service.registerCloneJobHandler();
 
-  app.post('/repos', { schema: { body: RepoInput } }, async (req, reply) => {
+  app.post('/repos', { schema: { body: RepoInput, response: { 200: Repo, 201: Repo } } }, async (req, reply) => {
     const { workspaceId, userId } = await getContext(app.container, req);
     const { repo, created } = await service.add(workspaceId, userId, req.body.url);
     reply.status(created ? 201 : 200);
     return repo;
   });
 
-  app.get('/repos', async (req) => {
+  app.get('/repos', { schema: { response: { 200: z.array(Repo) } } }, async (req) => {
     const { workspaceId } = await getContext(app.container, req);
     return service.list(workspaceId);
   });

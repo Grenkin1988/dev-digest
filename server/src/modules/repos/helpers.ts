@@ -1,5 +1,4 @@
 import { type Repo } from '@devdigest/shared';
-import * as t from '../../db/schema.js';
 import { AppError } from '../../platform/errors.js';
 import {
   GITHUB_HOST,
@@ -105,8 +104,21 @@ export function canonicalCloneUrl(owner: string, name: string): string {
   return `https://${GITHUB_HOST}/${owner}/${name}.git`;
 }
 
+/** The repo-row fields `toRepoDto` reads (structural: keeps this file off the db schema). */
+export interface RepoRowLike {
+  id: string;
+  workspaceId: string;
+  owner: string;
+  name: string;
+  fullName: string;
+  defaultBranch: string;
+  clonePath: string | null;
+  lastPolledAt: Date | null;
+  createdBy: string | null;
+}
+
 /** Map a persisted repo row to the API `Repo` DTO. */
-export function toRepoDto(row: typeof t.repos.$inferSelect): Repo {
+export function toRepoDto(row: RepoRowLike): Repo {
   return {
     id: row.id,
     workspace_id: row.workspaceId,
