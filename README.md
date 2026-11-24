@@ -149,6 +149,23 @@ Server tests split by filename: `*.it.test.ts` are DB-backed (testcontainers
 Postgres); everything else is hermetic. The browser e2e flows live in
 [`e2e/`](e2e/README.md) and run deterministically (no LLM).
 
+### PR self-review gate
+
+Before a PR is opened, run `/pr-self-review` in Claude Code
+([`.claude/skills/pr-self-review`](.claude/skills/pr-self-review/SKILL.md)). It routes every changed
+file to the skills that own it (UI skills on `client/`, onion/backend skills on `server/` and
+`reviewer-core/`, security where relevant), runs lint and typecheck on the touched packages, and
+blocks the PR on any CRITICAL finding:
+
+- A Claude Code hook (`.claude/settings.json`) refuses `gh pr create|merge|ready` when the
+  report is missing, stale or blocking.
+- The skill posts the commit status `pr-self-review`. **One-time setup:** in GitHub →
+  Settings → Branches → branch protection for `main`, add `pr-self-review` as a *required status
+  check*. Without it, GitHub does not block the merge.
+- Optional reminder for manual pushes: `git config core.hooksPath .githooks`.
+
+The status is self-reported from your machine. It prevents accidents; it is not a security control.
+
 ## Troubleshooting
 
 - **`relation ... does not exist` / API errors on first run** — migrations weren't
