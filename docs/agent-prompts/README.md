@@ -10,6 +10,10 @@ in the DB). The canonical, reviewable copies live next to this file:
 - [`security-reviewer.md`](./security-reviewer.md)
 - [`performance-reviewer.md`](./performance-reviewer.md)
 - [`test-quality-reviewer.md`](./test-quality-reviewer.md)
+- [`api-contract-reviewer.md`](./api-contract-reviewer.md) — its skills (importable
+  `SKILL.md`-style files with frontmatter) live in
+  [`skills/api-contract/`](./skills/api-contract/): `breaking-change`,
+  `response-schema`, `semver-discipline`, `deprecation-policy`
 
 > The DB is the source of truth at run time. These files are the human-readable
 > originals — when you change a prompt, edit the file here **and** push it to the
