@@ -6,7 +6,7 @@
 
 import React from "react";
 import { useTranslations } from "next-intl";
-import { Button, FormField, Icon, Markdown, Modal, SelectInput, TextInput } from "@devdigest/ui";
+import { Button, FormField, Icon, Markdown, Modal, SearchableSelect, TextInput } from "@devdigest/ui";
 import type { Skill, SkillType } from "@devdigest/shared";
 import { useCreateSkill, useImportSkillPreview, type ImportPreview } from "@/lib/hooks/skills";
 import { useToast } from "@/lib/toast";
@@ -121,10 +121,11 @@ export function ImportSkillModal({ onClose, onSaved }: { onClose: () => void; on
             <TextInput value={form.description} onChange={(description) => setForm({ ...form, description })} />
           </FormField>
           <FormField label={t("config.type")}>
-            <SelectInput
+            <SearchableSelect
               value={form.type}
               onChange={(v) => setForm({ ...form, type: v as SkillType })}
               options={typeOptions}
+              placeholder={t("config.typeSearch")}
             />
           </FormField>
           <div style={s.label}>{t("import.previewLabel")}</div>

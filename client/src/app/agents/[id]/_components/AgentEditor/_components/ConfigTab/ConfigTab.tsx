@@ -2,7 +2,7 @@
 
 import React from "react";
 import { useTranslations } from "next-intl";
-import { FormField, TextInput, SelectInput, SearchableSelect, Textarea, Toggle, Button } from "@devdigest/ui";
+import { FormField, TextInput, SearchableSelect, Textarea, Toggle, Button } from "@devdigest/ui";
 import type { Agent, CiFailOn, Provider, ReviewStrategy } from "@devdigest/shared";
 import { useUpdateAgent, useProviderModels } from "@/lib/hooks/agents";
 import { useToast } from "@/lib/toast";
@@ -66,10 +66,11 @@ export function ConfigTab({ agent }: { agent: Agent }) {
         <TextInput value={form.description} onChange={set("description")} />
       </FormField>
       <FormField label={t("config.provider")}>
-        <SelectInput
+        <SearchableSelect
           value={form.provider}
           onChange={(v) => set("provider")(v as Provider)}
           options={[...PROVIDER_OPTIONS]}
+          placeholder={t("config.optionSearch")}
         />
       </FormField>
       <FormField
@@ -84,17 +85,19 @@ export function ConfigTab({ agent }: { agent: Agent }) {
         />
       </FormField>
       <FormField label={t("config.strategy")} hint={t("config.strategyHint")}>
-        <SelectInput
+        <SearchableSelect
           value={form.strategy}
           onChange={(v) => set("strategy")(v as ReviewStrategy)}
           options={strategyOptions}
+          placeholder={t("config.optionSearch")}
         />
       </FormField>
       <FormField label={t("config.ciFailOn")} hint={t("config.ciFailOnHint")}>
-        <SelectInput
+        <SearchableSelect
           value={form.ci_fail_on}
           onChange={(v) => set("ci_fail_on")(v as CiFailOn)}
           options={ciFailOnOptions}
+          placeholder={t("config.optionSearch")}
         />
       </FormField>
       <FormField label={t("config.repoIntel")} hint={t("config.repoIntelHint")}>
@@ -106,7 +109,7 @@ export function ConfigTab({ agent }: { agent: Agent }) {
         <Textarea value={form.system_prompt} onChange={set("system_prompt")} rows={8} mono />
       </FormField>
       <FormField label={t("config.outputSchema")}>
-        <SelectInput value={OUTPUT_SCHEMA_VALUE} options={[OUTPUT_SCHEMA_VALUE]} />
+        <SearchableSelect value={OUTPUT_SCHEMA_VALUE} options={[OUTPUT_SCHEMA_VALUE]} placeholder={t("config.optionSearch")} />
       </FormField>
       <div style={s.actions}>
         <Button kind="primary" icon="Check" onClick={save} disabled={update.isPending}>

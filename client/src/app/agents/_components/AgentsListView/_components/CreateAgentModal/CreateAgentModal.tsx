@@ -3,7 +3,7 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Button, Modal, FormField, TextInput, SelectInput, Textarea } from "@devdigest/ui";
+import { Button, Modal, FormField, TextInput, SearchableSelect, Textarea } from "@devdigest/ui";
 import type { Provider } from "@devdigest/shared";
 import { useCreateAgent } from "@/lib/hooks/agents";
 import { DEFAULT_MODEL, DEFAULT_PROVIDER, MODAL_WIDTH, PROVIDER_OPTIONS } from "./constants";
@@ -61,10 +61,11 @@ export function CreateAgentModal({ onClose }: { onClose: () => void }) {
           />
         </FormField>
         <FormField label={t("create.fields.provider")}>
-          <SelectInput
+          <SearchableSelect
             value={provider}
             onChange={(v) => setProvider(v as Provider)}
             options={[...PROVIDER_OPTIONS]}
+            placeholder={t("config.optionSearch")}
           />
         </FormField>
         <FormField label={t("create.fields.model")}>

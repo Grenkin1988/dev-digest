@@ -7,7 +7,7 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Badge, Button, FormField, SelectInput, TextInput, Toggle } from "@devdigest/ui";
+import { Badge, Button, FormField, SearchableSelect, TextInput, Toggle } from "@devdigest/ui";
 import type { Skill, SkillType } from "@devdigest/shared";
 import { useCreateSkill, useDeleteSkill, useUpdateSkill } from "@/lib/hooks/skills";
 import { useToast } from "@/lib/toast";
@@ -110,7 +110,12 @@ export function ConfigTab({ skill }: { skill: Skill | null }) {
         />
       </FormField>
       <FormField label={t("config.type")}>
-        <SelectInput value={form.type} onChange={(v) => set("type")(v as SkillType)} options={typeOptions} />
+        <SearchableSelect
+          value={form.type}
+          onChange={(v) => set("type")(v as SkillType)}
+          options={typeOptions}
+          placeholder={t("config.typeSearch")}
+        />
       </FormField>
       <FormField label={t("config.body")} required>
         <BodyEditor value={form.body} onChange={set("body")} fileName={form.name.trim() || "skill"} dirty={dirty} />

@@ -82,6 +82,7 @@
     "refresh": "Refresh",
     "refreshing": "Refreshing…",
     "filterPlaceholder": "Filter pull requests…",
+    "sortSearch": "Search…",
     "sort": {
       "newest": "Sort: Newest",
       "oldest": "Sort: Oldest"

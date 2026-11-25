@@ -65,6 +65,7 @@
     "descriptionHint": "The description is the skill's interface — write it as a directive: when it applies and what the agent must do.",
     "descriptionPlaceholder": "Flag every new branch that has no test.",
     "type": "Type",
+    "typeSearch": "Search types…",
     "body": "Skill body",
     "bodyPlaceholder": "# Rule\nDescribe what the agent should check…",
     "unsaved": "unsaved",

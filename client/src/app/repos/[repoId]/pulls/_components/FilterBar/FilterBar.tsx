@@ -3,7 +3,7 @@
 
 import React from "react";
 import { useTranslations } from "next-intl";
-import { Chip, Button, TextInput, SelectInput } from "@devdigest/ui";
+import { Chip, Button, TextInput, SearchableSelect } from "@devdigest/ui";
 import { STATUS_FILTERS } from "../../constants";
 import { s } from "../../styles";
 
@@ -44,7 +44,15 @@ export function FilterBar({
         ))}
       </div>
       <div style={s.filterActions}>
-        <SelectInput value={sort} onChange={onSort} options={sortOptions} mono={false} />
+        <div style={{ width: 180 }}>
+          <SearchableSelect
+            value={sort}
+            onChange={onSort}
+            options={sortOptions}
+            mono={false}
+            placeholder={t("list.sortSearch")}
+          />
+        </div>
         <Button
           kind="secondary"
           size="sm"

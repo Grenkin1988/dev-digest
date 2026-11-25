@@ -64,6 +64,7 @@
     "modelHint": "Models are loaded dynamically from the provider's /models.",
     "modelEmptyHint": "No models loaded — set the {provider} API key in Settings → API Keys.",
     "modelSearch": "Search models…",
+    "optionSearch": "Search…",
     "systemPrompt": "System prompt",
     "systemPromptHint": "Loaded as the static system message. Enabled skills are appended below it.",
     "outputSchema": "Output schema",
