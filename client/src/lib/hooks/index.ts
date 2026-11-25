@@ -46,4 +46,24 @@ export {
 } from "./reviews";
 export { useRunTrace } from "./trace";
 export { useRepoIntelStatus, useResyncRepoIntel, type RepoIntelState } from "./repo-intel";
-export { settingsKeys, repoKeys, pullKeys, reviewKeys, agentKeys } from "./keys";
+export {
+  useSkills,
+  useSkill,
+  useSkillsStats,
+  useSkillStats,
+  useSkillVersions,
+  useCreateSkill,
+  useUpdateSkill,
+  useDeleteSkill,
+  useRestoreSkillVersion,
+  useImportSkillPreview,
+  useAgentSkills,
+  useSetAgentSkills,
+  type SkillVersion,
+  type SkillCardStats,
+  type SkillStats,
+  type ImportPreview,
+  type CreateSkillInput,
+  type UpdateSkillInput,
+} from "./skills";
+export { settingsKeys, repoKeys, pullKeys, reviewKeys, agentKeys, skillKeys } from "./keys";

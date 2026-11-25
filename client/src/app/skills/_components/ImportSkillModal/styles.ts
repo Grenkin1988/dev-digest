@@ -1,0 +1,62 @@
+import type { CSSProperties } from "react";
+
+/** Co-located styles for ImportSkillModal. */
+export const s = {
+  body: { padding: 24 } satisfies CSSProperties,
+  drop: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 10,
+    padding: "36px 24px",
+    border: "1px dashed var(--border-strong)",
+    borderRadius: 10,
+    background: "var(--bg-surface)",
+    color: "var(--text-secondary)",
+    textAlign: "center",
+  } satisfies CSSProperties,
+  hint: { fontSize: 12, color: "var(--text-muted)", maxWidth: 420, lineHeight: 1.5 } satisfies CSSProperties,
+  error: { marginTop: 14, fontSize: 13, color: "var(--crit)" } satisfies CSSProperties,
+  trust: {
+    display: "flex",
+    gap: 12,
+    padding: "12px 14px",
+    marginBottom: 20,
+    borderRadius: 8,
+    border: "1px solid color-mix(in srgb, var(--crit) 40%, transparent)",
+    background: "color-mix(in srgb, var(--crit) 10%, transparent)",
+  } satisfies CSSProperties,
+  trustIcon: { color: "var(--crit)", flexShrink: 0, marginTop: 2 } satisfies CSSProperties,
+  trustTitle: { fontSize: 13, fontWeight: 700 } satisfies CSSProperties,
+  trustBody: { fontSize: 13, color: "var(--text-secondary)", marginTop: 2, lineHeight: 1.45 } satisfies CSSProperties,
+  notice: (kind: "warn" | "crit"): CSSProperties => ({
+    marginBottom: 14,
+    fontSize: 13,
+    color: kind === "crit" ? "var(--crit)" : "var(--warn)",
+  }),
+  label: {
+    fontSize: 13,
+    fontWeight: 600,
+    color: "var(--text-secondary)",
+    marginBottom: 8,
+  } satisfies CSSProperties,
+  rendered: {
+    maxHeight: 280,
+    overflow: "auto",
+    padding: "14px 18px",
+    marginBottom: 20,
+    border: "1px solid var(--border)",
+    borderRadius: 8,
+    background: "var(--bg-surface)",
+  } satisfies CSSProperties,
+  ignored: {
+    margin: "0 0 20px",
+    padding: "10px 14px",
+    listStyle: "none",
+    border: "1px solid var(--border)",
+    borderRadius: 8,
+    fontSize: 12,
+    color: "var(--text-muted)",
+  } satisfies CSSProperties,
+  footer: { display: "flex", gap: 10, justifyContent: "flex-end", padding: "14px 24px", borderTop: "1px solid var(--border)" } satisfies CSSProperties,
+} as const;

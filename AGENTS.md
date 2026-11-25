@@ -59,4 +59,4 @@ user asks about FIRST — these are curated and may already answer it — then r
 - Repo indexing → read `server/src/modules/repo-intel/README.md`
 - Agent prompt templates → read `docs/agent-prompts/`
 - Recording a finding into a module's `INSIGHTS.md` → use the `engineering-insights` skill (`.claude/skills/engineering-insights/`)
-- Before opening or merging a PR (or when the gate hook blocks `gh pr …`) → run the `pr-self-review` skill (`.claude/skills/pr-self-review/`); never bypass the gate unless the user explicitly asks
+- Before opening or merging a PR (or when the gate hook blocks `gh pr …`) → ask the user to run `/pr-self-review` (`.claude/skills/pr-self-review/`; auto-invocation is off, so only the user can start it); never bypass the gate unless the user explicitly asks

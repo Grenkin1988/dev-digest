@@ -12,7 +12,8 @@ through next-intl. Commands are in [`../AGENTS.md`](../AGENTS.md); the screen li
 | `/` | Redirects to the first repo's PR list (empty state when there are no repos) |
 | `/repos/[repoId]/pulls` | PR list: `PRRow` with score, severity counters, total COST |
 | `/repos/[repoId]/pulls/[number]` | PR detail tabs (Overview, findings, diff, run history, trace drawer) |
-| `/agents`, `/agents/[id]` | Agent list and editor |
+| `/agents`, `/agents/[id]` | Agent list and editor (tabs: Config, Skills — link / unlink / reorder the agent's skills) |
+| `/skills`, `/skills/new`, `/skills/[id]` | Skills Lab: skill list + editor (tabs: Config, Preview, Stats, Versions) and the import modal (`.md` / `.zip`, preview before save) |
 | `/settings/[section]` | Settings sub-nav (`SETTINGS_SECTIONS` from `@devdigest/ui`): API keys (OpenRouter + GitHub PAT), … |
 | `/onboarding` | Add a repository (`_components/AddRepoView`) |
 

@@ -8,6 +8,7 @@ import type { ReviewRepository, FindingRow, PullRow, ReviewRow } from './reposit
 import { REVIEW_STRATEGY } from './constants.js';
 import { taskLine } from './helpers.js';
 import { loadDiff } from './diff-loader.js';
+import { estimateTokens, formatSkillBlock } from '../skills/helpers.js';
 
 /** Thrown by a run when the user cancels it mid-flight (between map files). */
 export class RunCancelledError extends Error {
@@ -183,6 +184,11 @@ export class ReviewRunExecutor {
 
       const task = taskLine(pull) + rankNote;
 
+      // Skills: linked to this agent AND globally enabled, in link order. They
+      // reach the prompt as the "## Skills / rules" section (and the trace's
+      // Skills block); disabled or unlinked skills contribute nothing.
+      const skills = await this.buildSkills(agent, runLog);
+
       // ---- Engine: assemble → single-pass → grounding -----------------------
       // The pure review pipeline lives in @devdigest/reviewer-core (shared with
       // the CI runner). The service owns only I/O: repo-intel context resolution
@@ -200,6 +206,8 @@ export class ReviewRunExecutor {
         ...(callersDigest ? { callers: callersDigest } : {}),
         // T3 — repo skeleton, same omit-when-empty contract.
         ...(repoMap ? { repoMap } : {}),
+        // Ordered skill blocks; omitted when the agent has none enabled.
+        ...(skills.length > 0 ? { skills } : {}),
         // PR author's description/body — untrusted; assemblePrompt wraps +
         // truncates it. Omitted when the PR has no body.
         ...(pull.body ? { prDescription: pull.body } : {}),
@@ -375,6 +383,27 @@ export class ReviewRunExecutor {
     } catch (err) {
       runLog.info(`repo map: repoIntel failed — ${(err as Error).message}`);
       return undefined;
+    }
+  }
+
+  /**
+   * The agent's enabled skills as prompt blocks (link order). Logs one
+   * `skills:` line when any are attached; nothing otherwise. Best-effort: a
+   * lookup failure must not fail the review, so it degrades to no skills.
+   */
+  private async buildSkills(agent: AgentRow, runLog: RunLogger): Promise<string[]> {
+    try {
+      const linked = await this.deps.agents.enabledLinkedSkills(agent.id);
+      if (linked.length === 0) return [];
+      const blocks = linked.map((l) => formatSkillBlock(l.skill));
+      const tokens = estimateTokens(blocks.join('\n\n'));
+      runLog.info(
+        `skills: ${linked.length} attached — ${linked.map((l) => l.skill.name).join(', ')} (~${tokens} tok)`,
+      );
+      return blocks;
+    } catch (err) {
+      runLog.error(`skills: could not load (${(err as Error).message}) — continuing without`);
+      return [];
     }
   }
 

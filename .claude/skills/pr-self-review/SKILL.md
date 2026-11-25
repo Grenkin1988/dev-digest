@@ -1,6 +1,7 @@
 ---
 name: pr-self-review
 description: "Pre-PR gate for DevDigest: reviews every open local change (branch commits vs main + staged + unstaged + untracked) by routing each changed file to the project skills that own it — UI skills (frontend-architecture, react-best-practices, next-best-practices, react-testing-library) on client files, backend architecture skills (onion-architecture, fastify-best-practices, drizzle-orm-patterns, postgresql-table-design, zod) on server/reviewer-core files, security where relevant — plus lint and typecheck on touched packages. Any CRITICAL finding blocks the PR: a hook refuses `gh pr create/merge/ready` and the GitHub commit status `pr-self-review` is set to failure. Use before opening or merging any pull request, when a hook says the self-review is missing or stale, or when the user says 'self review', 'review my changes', 'check before PR', 'can I open a PR', 'pr-self-review'."
+disable-model-invocation: true
 metadata:
   version: "1.0.0"
   tags: review, pull-request, gate, quality, architecture

@@ -10,7 +10,7 @@ adapters are listed in [`../README.md`](../README.md).
 | Path | Holds |
 |------|-------|
 | `src/server.ts` → `src/app.ts` | Boot; `buildApp` wires plugins, the error handler and modules |
-| `src/modules/<name>/routes.ts` | One Fastify plugin per feature (`settings`, `repos`, `pulls`, `polling`, `workspace`, `agents`, `reviews`, `repoIntel`) |
+| `src/modules/<name>/routes.ts` | One Fastify plugin per feature (`settings`, `repos`, `pulls`, `polling`, `workspace`, `agents`, `skills`, `reviews`, `repoIntel`) |
 | `src/modules/index.ts` | Static module registry; `app.ts:188` registers each entry |
 | `src/modules/reviews/` | Review runs: `service.ts` (API-facing), `run-executor.ts` (background execution), `deps.ts` (their injected deps), `repository/*.repo.ts` (SQL), `cost.ts` (pure cost math) |
 | `src/modules/pulls/` | PR import + reads: `service.ts` (sync gate, detail TTL, comments), `repository.ts` (SQL, batched upsert, transactional detail replace), `helpers.ts` (DTO mapping, severity rollup) |
@@ -35,7 +35,7 @@ flowchart LR
 - Route schemas, for both request and response, are the Zod contracts from `src/vendor/shared`.
 - External systems are reached only through the `Container` (`src/platform/container.ts:66`). Tests swap them with `ContainerOverrides` and `src/adapters/mocks.ts`.
 - API keys are read only through `LocalSecretsProvider` (`src/adapters/secrets/local.ts:16`).
-- Every application service is built once in the `Container` (`reposService`, `agentsService`, `reviewService`, `pullsService`, `settingsService`, `repoIntelService`) from a narrow deps interface. Routes, job handlers and boot code read it from there and never construct one themselves.
+- Every application service is built once in the `Container` (`reposService`, `agentsService`, `skillsService`, `reviewService`, `pullsService`, `settingsService`, `repoIntelService`) from a narrow deps interface. Routes, job handlers and boot code read it from there and never construct one themselves.
 - Unexpected errors become a generic `500 internal_error`. The detail goes only to the log (`src/app.ts:129`, `setErrorHandler`).
 
 ## PR sync flow (local-first)

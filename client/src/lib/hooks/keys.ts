@@ -44,4 +44,15 @@ export const agentKeys = {
   /** Prefix: invalidating it drops every provider's model list. */
   providerModelsAll: ["provider-models"] as const,
   providerModels: (provider: Id) => ["provider-models", provider] as const,
+  /** Ordered skill links of one agent (agent editor → Skills tab). */
+  skills: (id: Id) => ["agent-skills", id] as const,
+};
+
+export const skillKeys = {
+  all: ["skills"] as const,
+  detail: (id: Id) => ["skill", id] as const,
+  /** Card-footer stats for every skill. */
+  statsAll: ["skills-stats"] as const,
+  stats: (id: Id) => ["skill-stats", id] as const,
+  versions: (id: Id) => ["skill-versions", id] as const,
 };

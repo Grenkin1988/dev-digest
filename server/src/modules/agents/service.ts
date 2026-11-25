@@ -10,6 +10,7 @@ import type {
 } from '@devdigest/shared';
 import type { AgentsRepository } from './repository.js';
 import { toAgentDto, toAgentVersionDto } from './helpers.js';
+import { ValidationError } from '../../platform/errors.js';
 
 /**
  * A2 — agents service. Business logic for the Agents tab + Agent Editor.
@@ -158,7 +159,9 @@ export class AgentsService {
   ): Promise<AgentSkillLink[] | undefined> {
     const agent = await this.repo.getById(workspaceId, agentId);
     if (!agent) return undefined;
-    await this.repo.setSkills(agentId, skillIds);
+    const unique = [...new Set(skillIds)];
+    await this.assertSkillsInWorkspace(workspaceId, unique);
+    await this.repo.setSkills(agentId, unique);
     return this.skillLinks(agentId);
   }
 
@@ -171,10 +174,18 @@ export class AgentsService {
   ): Promise<AgentSkillLink[] | undefined> {
     const agent = await this.repo.getById(workspaceId, agentId);
     if (!agent) return undefined;
+    await this.assertSkillsInWorkspace(workspaceId, [skillId]);
     const existing = await this.repo.linkedSkills(agentId);
     const resolvedOrder = order ?? existing.length;
     await this.repo.linkSkill(agentId, skillId, resolvedOrder);
     return this.skillLinks(agentId);
+  }
+
+  /** Reject skill ids that don't belong to this workspace (422). */
+  private async assertSkillsInWorkspace(workspaceId: string, skillIds: string[]): Promise<void> {
+    if (skillIds.length === 0) return;
+    const found = await this.repo.countSkillsInWorkspace(workspaceId, skillIds);
+    if (found !== skillIds.length) throw new ValidationError('One or more skills do not exist in this workspace.');
   }
 
   /**

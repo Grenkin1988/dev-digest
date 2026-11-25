@@ -1,4 +1,4 @@
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 import type { Db } from '../../db/client.js';
 import * as t from '../../db/schema.js';
 import type { CiFailOn, Provider, ReviewStrategy } from '@devdigest/shared';
@@ -197,6 +197,24 @@ export class AgentsRepository {
       .where(eq(t.agentSkills.agentId, agentId))
       .orderBy(asc(t.agentSkills.order));
     return rows.map((r) => ({ skill: r.skill, order: r.order }));
+  }
+
+  /**
+   * Skills a review run actually uses: linked to the agent AND globally enabled,
+   * in link order. A disabled skill stays linked but contributes nothing.
+   */
+  async enabledLinkedSkills(agentId: string): Promise<LinkedSkillRow[]> {
+    return (await this.linkedSkills(agentId)).filter((l) => l.skill.enabled);
+  }
+
+  /** How many of `skillIds` exist in this workspace (to reject foreign ids). */
+  async countSkillsInWorkspace(workspaceId: string, skillIds: string[]): Promise<number> {
+    if (skillIds.length === 0) return 0;
+    const rows = await this.db
+      .select({ id: t.skills.id })
+      .from(t.skills)
+      .where(and(eq(t.skills.workspaceId, workspaceId), inArray(t.skills.id, skillIds)));
+    return rows.length;
   }
 
   async skillIdsForAgent(agentId: string): Promise<string[]> {

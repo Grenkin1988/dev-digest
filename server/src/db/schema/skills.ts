@@ -28,6 +28,10 @@ export const skillVersions = pgTable(
       .references(() => skills.id, { onDelete: 'cascade' }),
     version: integer('version').notNull(),
     body: text('body').notNull(),
+    /** Skill description at this version (null on rows written before it was tracked). */
+    description: text('description'),
+    /** Change note shown in the Versions tab. */
+    message: text('message'),
     createdAt: now(),
   },
   (t) => ({ pk: primaryKey({ columns: [t.skillId, t.version] }) }),
