@@ -33,8 +33,10 @@ const CreateSkillBody = z.object({
   description: z.string().trim().min(1).max(2000),
   type: SkillType,
   body: z.string().min(1),
-  /** Only manual creation or a confirmed import can be requested by a client. */
-  source: SkillSource.extract(['manual', 'imported_url']).optional(),
+  /** Manual creation, a confirmed import, or a skill built from extracted conventions. */
+  source: SkillSource.extract(['manual', 'imported_url', 'extracted']).optional(),
+  /** Files that evidence an extracted skill (e.g. convention evidence paths). */
+  evidence_files: z.array(z.string()).max(50).optional(),
   enabled: z.boolean().optional(),
   message: z.string().max(200).optional(),
 });
@@ -116,7 +118,11 @@ export default async function skillsRoutes(appBase: FastifyInstance) {
 
   app.post('/skills', { schema: { body: CreateSkillBody, response: { 201: Skill } } }, async (req, reply) => {
     const { workspaceId } = await getContext(app.container, req);
-    const skill = await service.create(workspaceId, req.body);
+    const { evidence_files, ...rest } = req.body;
+    const skill = await service.create(workspaceId, {
+      ...rest,
+      ...(evidence_files !== undefined ? { evidenceFiles: evidence_files } : {}),
+    });
     reply.status(201);
     return skill;
   });

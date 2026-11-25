@@ -26,6 +26,9 @@ import { ConfigError } from './errors.js';
 import { AgentsRepository } from '../modules/agents/repository.js';
 import { SkillsRepository } from '../modules/skills/repository.js';
 import { SkillsService } from '../modules/skills/service.js';
+import { ConventionsRepository } from '../modules/conventions/repository.js';
+import { ConventionsService } from '../modules/conventions/service.js';
+import { resolveFeatureModel } from '../modules/settings/feature-models.js';
 import { ReviewRepository } from '../modules/reviews/repository.js';
 import type { RepoIntel } from '../modules/repo-intel/types.js';
 import { RepoIntelService } from '../modules/repo-intel/service.js';
@@ -97,6 +100,7 @@ export class Container {
   private _reposService?: RepoService;
   private _agentsService?: AgentsService;
   private _skillsService?: SkillsService;
+  private _conventionsService?: ConventionsService;
   private _reviewService?: ReviewService;
   private _pullsService?: PullsService;
   private _settingsService?: SettingsService;
@@ -144,6 +148,17 @@ export class Container {
 
   get skillsService(): SkillsService {
     return (this._skillsService ??= new SkillsService({ repo: this.skillsRepo }));
+  }
+
+  get conventionsService(): ConventionsService {
+    return (this._conventionsService ??= new ConventionsService({
+      repo: new ConventionsRepository(this.db),
+      getRepo: (ws, id) => this.repoRepo.getById(ws, id),
+      samples: (repoId, n) => this.repoIntel.getConventionSamples(repoId, n),
+      readFile: (ref, path) => this.git.readFile(ref, path),
+      model: (ws) => resolveFeatureModel(this, ws, 'conventions'),
+      llm: (provider) => this.llm(provider),
+    }));
   }
 
   get reviewService(): ReviewService {

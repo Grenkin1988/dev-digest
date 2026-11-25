@@ -21,6 +21,7 @@ export interface InsertSkill {
   type: SkillType;
   source: SkillSource;
   body: string;
+  evidenceFiles?: string[];
   enabled?: boolean;
   /** Change note for version 1. */
   message: string;
@@ -73,6 +74,7 @@ export class SkillsRepository {
           type: v.type,
           source: v.source,
           body: v.body,
+          ...(v.evidenceFiles !== undefined ? { evidenceFiles: v.evidenceFiles } : {}),
           enabled: v.enabled ?? true,
           version: INITIAL_SKILL_VERSION,
         })

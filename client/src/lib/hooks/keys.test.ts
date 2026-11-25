@@ -1,7 +1,7 @@
 /* The key VALUES are a contract between screens (one screen reads a key,
    another invalidates it). Pin them so a refactor cannot silently split a cache. */
 import { describe, it, expect } from "vitest";
-import { agentKeys, pullKeys, repoKeys, reviewKeys, settingsKeys, skillKeys } from "./keys";
+import { agentKeys, conventionKeys, pullKeys, repoKeys, reviewKeys, settingsKeys, skillKeys } from "./keys";
 
 describe("query keys", () => {
   it("keep the values other screens and tests depend on", () => {
@@ -16,6 +16,7 @@ describe("query keys", () => {
     expect(skillKeys.all).toEqual(["skills"]);
     expect(skillKeys.detail("s1")).toEqual(["skill", "s1"]);
     expect(skillKeys.versions("s1")).toEqual(["skill-versions", "s1"]);
+    expect(conventionKeys.list("r1")).toEqual(["conventions", "r1"]);
     expect(repoKeys.all).toEqual(["repos"]);
     expect(settingsKeys.secretsStatus).toEqual(["secrets-status"]);
   });

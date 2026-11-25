@@ -34,6 +34,7 @@ export interface CreateSkillInput {
   type: SkillType;
   body: string;
   source?: SkillSource;
+  evidenceFiles?: string[];
   enabled?: boolean;
   message?: string;
 }
@@ -89,6 +90,7 @@ export class SkillsService {
       type: input.type,
       source: input.source ?? 'manual',
       body: input.body,
+      ...(input.evidenceFiles !== undefined ? { evidenceFiles: input.evidenceFiles } : {}),
       ...(input.enabled !== undefined ? { enabled: input.enabled } : {}),
       message: input.message?.trim() || MSG_INITIAL,
     });

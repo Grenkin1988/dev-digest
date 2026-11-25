@@ -56,3 +56,8 @@ export const skillKeys = {
   stats: (id: Id) => ["skill-stats", id] as const,
   versions: (id: Id) => ["skill-versions", id] as const,
 };
+
+export const conventionKeys = {
+  /** Saved convention candidates of one repo (Conventions page). */
+  list: (repoId: Id) => ["conventions", repoId] as const,
+};

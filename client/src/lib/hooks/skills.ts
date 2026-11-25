@@ -44,7 +44,8 @@ export interface CreateSkillInput {
   description: string;
   type: SkillType;
   body: string;
-  source?: Extract<SkillSource, "manual" | "imported_url">;
+  source?: Extract<SkillSource, "manual" | "imported_url" | "extracted">;
+  evidence_files?: string[];
   enabled?: boolean;
   message?: string;
 }

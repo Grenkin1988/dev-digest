@@ -66,4 +66,12 @@ export {
   type CreateSkillInput,
   type UpdateSkillInput,
 } from "./skills";
-export { settingsKeys, repoKeys, pullKeys, reviewKeys, agentKeys, skillKeys } from "./keys";
+export {
+  useConventions,
+  useExtractConventions,
+  useUpdateConvention,
+  type ConventionView,
+  type ConventionList,
+  type ConventionStatus,
+} from "./conventions";
+export { settingsKeys, conventionKeys, repoKeys, pullKeys, reviewKeys, agentKeys, skillKeys } from "./keys";

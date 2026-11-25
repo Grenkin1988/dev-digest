@@ -10,6 +10,9 @@
     "runExtraction": "Run extraction",
     "extractionFailed": "Extraction failed",
     "loadError": "Could not load conventions.",
+    "acceptedCount": "{accepted} of {total} accepted",
+    "lastScan": "last scan {when}",
+    "createSkill": "Create skill",
     "empty": {
       "title": "No conventions extracted yet",
       "body": "Scan the repo to surface house-rules — naming, error handling, structure — each backed by evidence you can turn into a Skill.",
@@ -21,6 +24,32 @@
     "confidence": "Confidence",
     "accepted": "Accepted",
     "accepting": "Accepting…",
-    "acceptAsSkill": "Accept as Skill"
+    "acceptAsSkill": "Accept as Skill",
+    "accept": "Accept",
+    "reject": "Reject",
+    "rejected": "Rejected",
+    "edit": "Edit rule",
+    "save": "Save",
+    "cancel": "Cancel",
+    "ruleLabel": "Rule text",
+    "uncategorised": "general"
+  },
+  "modal": {
+    "title": "Create skill from conventions",
+    "subtitle": "Merged from {count, plural, one {# accepted convention} other {# accepted conventions}} in {repo}. Editable before saving.",
+    "include": "Include",
+    "name": "Name",
+    "nameHint": "Lowercase letters, digits and dashes, e.g. repo-conventions.",
+    "nameInvalid": "Use a lowercase slug (letters, digits, dashes).",
+    "nameTaken": "A skill with this name already exists.",
+    "description": "Description",
+    "enabled": "Enabled",
+    "enabledHint": "Off by default — enable it once you have reviewed the text.",
+    "body": "Skill body (Markdown)",
+    "cancel": "Cancel",
+    "create": "Create skill",
+    "creating": "Creating…",
+    "created": "Skill {name} created",
+    "viewSkill": "Open skill"
   }
 }
