@@ -1,6 +1,7 @@
 import { describe, it, expect, afterAll } from 'vitest';
 import { buildApp } from '../src/app.js';
 import { loadConfig } from '../src/platform/config.js';
+import { fakeAuth } from './fake-auth.js';
 import { MockGitHubClient, MockLLMProvider } from '../src/adapters/mocks.js';
 
 /**
@@ -22,7 +23,7 @@ describe('routes (no DB)', () => {
   it('POST /settings/test-connection (github) returns structured ConnTestResult', async () => {
     const app = await buildApp({
       config,
-      overrides: { github: new MockGitHubClient({ login: 'octocat' }) },
+      overrides: { auth: fakeAuth, github: new MockGitHubClient({ login: 'octocat' }) },
     });
     const res = await app.inject({
       method: 'POST',
@@ -41,6 +42,7 @@ describe('routes (no DB)', () => {
     const app = await buildApp({
       config,
       overrides: {
+        auth: fakeAuth,
         llm: { openai: new MockLLMProvider('openai', { models: [{ id: 'gpt-4.1', provider: 'openai' }] }) },
       },
     });
