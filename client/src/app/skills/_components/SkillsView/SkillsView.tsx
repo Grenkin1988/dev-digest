@@ -10,6 +10,7 @@ import { Button, Dropdown, EmptyState, ErrorState, Icon, Skeleton } from "@devdi
 import { AppShell } from "@/components/app-shell";
 import { ApiError } from "@/lib/api";
 import { useSkill, useSkills, useSkillsStats, useUpdateSkill } from "@/lib/hooks/skills";
+import { useConfirmDeleteSkill } from "../../_hooks/useConfirmDeleteSkill";
 import { SkillCard } from "../SkillCard";
 import { SkillEditor, resolveTab, type SkillTab } from "../SkillEditor";
 import { ImportSkillModal } from "../ImportSkillModal";
@@ -24,6 +25,7 @@ export function SkillsView({ id, isNew }: { id?: string; isNew?: boolean }) {
   const { data: stats } = useSkillsStats();
   const { data: skill, isLoading: skillLoading, isError: skillError, error, refetch: refetchSkill } = useSkill(id);
   const update = useUpdateSkill();
+  const del = useConfirmDeleteSkill();
   const [search, setSearch] = React.useState("");
   const [importing, setImporting] = React.useState(false);
 
@@ -43,6 +45,7 @@ export function SkillsView({ id, isNew }: { id?: string; isNew?: boolean }) {
 
   return (
     <AppShell crumb={crumb}>
+      {del.dialog}
       {importing && (
         <ImportSkillModal
           onClose={() => setImporting(false)}
@@ -99,8 +102,10 @@ export function SkillsView({ id, isNew }: { id?: string; isNew?: boolean }) {
                 skill={sk}
                 stats={stats?.[sk.id]}
                 active={sk.id === id}
+                deleting={del.pendingId === sk.id}
                 onClick={() => router.push(`/skills/${sk.id}?tab=${id ? tab : "config"}`)}
                 onToggle={(enabled) => update.mutate({ id: sk.id, patch: { enabled } })}
+                onDelete={() => void del.remove(sk, sk.id === id ? () => router.replace("/skills") : undefined)}
               />
             ))}
           </div>

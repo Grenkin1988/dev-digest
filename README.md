@@ -109,6 +109,11 @@ This script:
 Open **http://localhost:3000**. Press **Ctrl-C** to stop the dev servers —
 Postgres keeps running (`docker compose down` to stop it).
 
+If `:3001` or `:3000` is already taken (typically a dev server orphaned by an earlier
+run whose terminal was closed), the script stops with the owning PID instead of
+starting a second API that dies with `EADDRINUSE`. Run `./scripts/dev.sh --kill-stale`
+to stop the leftover server and start fresh.
+
 Flags: `--no-seed` · `--no-client` · `--db-only` · `--help`.
 
 > Add your keys in `server/.env` (`OPENAI_API_KEY` / `ANTHROPIC_API_KEY`,

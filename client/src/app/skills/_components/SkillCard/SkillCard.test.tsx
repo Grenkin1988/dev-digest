@@ -27,14 +27,34 @@ function renderCard(ui: React.ReactElement) {
 }
 
 describe("SkillCard", () => {
-  it("shows name, type, source and the agents / pull / accept footer", () => {
+  it("shows name, type, source · version and the agents / pull freq / accept footer", () => {
     renderCard(<SkillCard skill={SKILL} stats={{ agents: 1, pull_pct: 92, accept_pct: 88 }} />);
     expect(screen.getByText("secret-leakage-gate")).toBeInTheDocument();
     expect(screen.getByText("security")).toBeInTheDocument();
-    expect(screen.getByText("Imported")).toBeInTheDocument();
+    expect(screen.getByText("Imported · v2")).toBeInTheDocument();
     expect(screen.getByText("1 agent")).toBeInTheDocument();
-    expect(screen.getByText("92% pull")).toBeInTheDocument();
+    expect(screen.getByText("92% pull freq")).toBeInTheDocument();
     expect(screen.getByText("88% accept")).toBeInTheDocument();
+  });
+
+  it("keeps the agent chip while stats are still loading", () => {
+    renderCard(<SkillCard skill={SKILL} />);
+    expect(screen.getByText("— agents")).toBeInTheDocument();
+    expect(screen.queryByText("no runs yet")).not.toBeInTheDocument();
+  });
+
+  it("deletes from the trash button without opening the card", () => {
+    const onClick = vi.fn();
+    const onDelete = vi.fn();
+    renderCard(<SkillCard skill={SKILL} onClick={onClick} onDelete={onDelete} />);
+    fireEvent.click(screen.getByRole("button", { name: "Delete secret-leakage-gate" }));
+    expect(onDelete).toHaveBeenCalledTimes(1);
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
+  it("disables the trash button while that skill is being deleted", () => {
+    renderCard(<SkillCard skill={SKILL} deleting onDelete={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "Delete secret-leakage-gate" })).toBeDisabled();
   });
 
   it("says there is no data yet instead of showing 0% when nothing ran", () => {

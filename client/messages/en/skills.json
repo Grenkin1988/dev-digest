@@ -23,10 +23,13 @@
   },
   "card": {
     "agents": "{count, plural, one {# agent} other {# agents}}",
-    "pull": "{pct}% pull",
+    "agentsUnknown": "— agents",
+    "pull": "{pct}% pull freq",
     "accept": "{pct}% accept",
     "noData": "no runs yet",
+    "sourceVersion": "{source} · v{version}",
     "toggleLabel": "Enable {name}",
+    "deleteLabel": "Delete {name}",
     "disabledTitle": "Disabled — not added to any agent's prompt"
   },
   "type": {

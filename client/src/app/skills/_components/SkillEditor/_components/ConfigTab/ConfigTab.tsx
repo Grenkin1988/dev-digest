@@ -9,10 +9,10 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Badge, Button, FormField, SearchableSelect, TextInput, Toggle } from "@devdigest/ui";
 import type { Skill, SkillType } from "@devdigest/shared";
-import { useCreateSkill, useDeleteSkill, useUpdateSkill } from "@/lib/hooks/skills";
+import { useCreateSkill, useUpdateSkill } from "@/lib/hooks/skills";
 import { useToast } from "@/lib/toast";
-import { useConfirm } from "@/components/confirm-dialog";
 import { SKILL_TYPES } from "@/components/skill-type-badge";
+import { useConfirmDeleteSkill } from "../../../../_hooks/useConfirmDeleteSkill";
 import { BodyEditor } from "../BodyEditor";
 import { canSave, configReducer, formFromSkill, isDirty, toPatch, type ConfigForm } from "./helpers";
 import { s } from "./styles";
@@ -21,10 +21,9 @@ export function ConfigTab({ skill }: { skill: Skill | null }) {
   const t = useTranslations("skills");
   const router = useRouter();
   const toast = useToast();
-  const { confirm, dialog } = useConfirm();
   const create = useCreateSkill();
   const update = useUpdateSkill();
-  const del = useDeleteSkill();
+  const del = useConfirmDeleteSkill();
   const [form, dispatch] = React.useReducer(configReducer, skill, formFromSkill);
   const set =
     <K extends keyof ConfigForm>(field: K) =>
@@ -68,16 +67,8 @@ export function ConfigTab({ skill }: { skill: Skill | null }) {
     );
   };
 
-  const remove = async () => {
-    if (!skill) return;
-    const ok = await confirm({ title: t("config.deleteTitle", { name: skill.name }), body: t("config.deleteBody") });
-    if (!ok) return;
-    del.mutate(skill.id, {
-      onSuccess: () => {
-        toast.success(t("config.deletedToast"));
-        router.replace("/skills");
-      },
-    });
+  const remove = () => {
+    if (skill) void del.remove(skill, () => router.replace("/skills"));
   };
 
   const cancel = () => {
@@ -143,7 +134,7 @@ export function ConfigTab({ skill }: { skill: Skill | null }) {
           </Button>
         )}
       </div>
-      {dialog}
+      {del.dialog}
     </div>
   );
 }
