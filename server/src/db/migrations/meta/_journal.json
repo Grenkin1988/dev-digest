@@ -78,6 +78,20 @@
       "when": 1795198536544,
       "tag": "0010_luxuriant_cassandra_nova",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1795590357347,
+      "tag": "0011_typical_magdalene",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1795615763962,
+      "tag": "0012_bouncy_chameleon",
+      "breakpoints": true
     }
   ]
 }

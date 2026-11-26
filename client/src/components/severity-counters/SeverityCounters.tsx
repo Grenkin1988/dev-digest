@@ -1,25 +1,35 @@
 /* SeverityCounters — per-severity finding counters (icon + count, coloured via
    SEV). Hover/focus reveals the top findings of that level. When `onSelect` is
    given each counter is a toggle button (used as a severity filter); the active
-   one is highlighted with its SEV colour and the rest fade. Counts are derived
-   from findings already in memory — nothing here talks to the server. */
+   one is highlighted with its SEV colour and the rest fade.
+
+   Presentational: data comes in through props, nothing here talks to the server.
+   Counts are derived from `findings`, unless the caller already has them
+   (`counts`, e.g. the PR list's server-side rollup) — then `findings` only
+   feed the popover and may arrive later (`findingsLoading` + `onPopoverOpen`). */
 "use client";
 
 import React from "react";
-import { createPortal } from "react-dom";
 import { useTranslations } from "next-intl";
 import { Icon, SEV } from "@devdigest/ui";
 import type { FindingRecord } from "@devdigest/shared";
 import {
   SEVERITY_LEVELS,
   countBySeverity,
-  topFindings,
   type CounterSeverity,
+  type SeverityCounts,
 } from "./helpers";
+import { SeverityPopover } from "./_components/SeverityPopover";
 import { s } from "./styles";
 
 export interface SeverityCountersProps {
   findings: FindingRecord[];
+  /** Precomputed counts; when given they win over counting `findings`. */
+  counts?: SeverityCounts | null;
+  /** The popover's findings are still loading (lazy callers). */
+  findingsLoading?: boolean;
+  /** Called the first time a popover opens, so a caller can fetch findings lazily. */
+  onPopoverOpen?: () => void;
   /** Show levels with 0 findings (run body) vs. only non-empty levels (PR list). */
   showZero?: boolean;
   /** Currently selected filter level, if any. */
@@ -28,17 +38,11 @@ export interface SeverityCountersProps {
   onSelect?: (severity: CounterSeverity) => void;
 }
 
-/** Room the popover needs below its anchor before it flips above. */
-const POPOVER_FLIP_SPACE = 220;
-
-function location(f: FindingRecord): string {
-  return f.end_line && f.end_line !== f.start_line
-    ? `${f.file}:${f.start_line}–${f.end_line}`
-    : `${f.file}:${f.start_line}`;
-}
-
 export function SeverityCounters({
   findings,
+  counts: givenCounts,
+  findingsLoading = false,
+  onPopoverOpen,
   showZero = false,
   active = null,
   onSelect,
@@ -46,11 +50,13 @@ export function SeverityCounters({
   const t = useTranslations("prReview.severityCounters");
   const [hover, setHover] = React.useState<{ sev: CounterSeverity; rect: DOMRect } | null>(null);
   const baseId = React.useId();
-  const counts = React.useMemo(() => countBySeverity(findings), [findings]);
+  const counts = givenCounts ?? countBySeverity(findings);
   const levels = SEVERITY_LEVELS.filter((sev) => showZero || counts[sev] > 0);
 
-  const show = (sev: CounterSeverity) => (e: React.SyntheticEvent<HTMLElement>) =>
+  const show = (sev: CounterSeverity) => (e: React.SyntheticEvent<HTMLElement>) => {
+    onPopoverOpen?.();
     setHover({ sev, rect: e.currentTarget.getBoundingClientRect() });
+  };
   const hide = () => setHover(null);
 
   if (levels.length === 0) {
@@ -115,6 +121,7 @@ export function SeverityCounters({
                 id={popoverId}
                 anchor={hover.rect}
                 findings={findings}
+                loading={findingsLoading}
                 severity={sev}
                 count={count}
                 hint={
@@ -130,63 +137,6 @@ export function SeverityCounters({
         );
       })}
     </div>
-  );
-}
-
-function SeverityPopover({
-  id,
-  anchor,
-  findings,
-  severity,
-  count,
-  hint,
-}: {
-  id: string;
-  anchor: DOMRect;
-  findings: FindingRecord[];
-  severity: CounterSeverity;
-  count: number;
-  hint: string | null;
-}) {
-  const t = useTranslations("prReview.severityCounters");
-  const meta = SEV[severity];
-  const I = Icon[meta.icon];
-  const { top, more } = topFindings(findings, severity);
-  // Portalled + fixed so overflow:hidden ancestors (PR table, run accordion)
-  // can't clip it; flips above the counter near the viewport bottom.
-  const flip = anchor.bottom + POPOVER_FLIP_SPACE > window.innerHeight;
-  const position: React.CSSProperties = flip
-    ? { left: anchor.left, bottom: window.innerHeight - anchor.top + 6 }
-    : { left: anchor.left, top: anchor.bottom + 6 };
-  return createPortal(
-    <div
-      id={id}
-      role="tooltip"
-      style={{ ...s.popover, ...position }}
-      onClick={(e) => e.stopPropagation()}
-    >
-      <div style={s.popoverTitle(meta.c)}>
-        <I size={13} aria-hidden />
-        {count > 0
-          ? t("popoverTitle", { count, level: meta.label })
-          : t("none", { level: meta.label.toLowerCase() })}
-      </div>
-      {top.length > 0 && (
-        <ul style={s.popoverList}>
-          {top.map((f) => (
-            <li key={f.id}>
-              <div style={s.findingTitle}>{f.title}</div>
-              <div className="mono" style={s.findingLoc}>
-                {location(f)}
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-      {more > 0 && <div style={{ ...s.muted, marginTop: 6 }}>{t("more", { count: more })}</div>}
-      {hint && <div style={s.hint}>{hint}</div>}
-    </div>,
-    document.body,
   );
 }
 

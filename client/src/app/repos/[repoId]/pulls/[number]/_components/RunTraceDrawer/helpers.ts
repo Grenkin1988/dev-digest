@@ -22,6 +22,11 @@ export function formatSeconds(ms: number): string {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
+/** Rough token estimate (≈4 chars/token) for a prompt segment — same rule as the server run log. */
+export function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 4);
+}
+
 /** Token in→out summary (e.g. "12k→1.5k"). */
 export function formatTokens(tokensIn: number, tokensOut: number): string {
   return `${(tokensIn / 1000).toFixed(0)}k→${(tokensOut / 1000).toFixed(1)}k`;

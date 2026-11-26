@@ -1,4 +1,4 @@
-import type { Container } from '../../platform/container.js';
+import type { LLMProvider } from '@devdigest/shared';
 import type {
   Agent,
   AgentSkillLink,
@@ -8,8 +8,9 @@ import type {
   Provider,
   ReviewStrategy,
 } from '@devdigest/shared';
-import { AgentsRepository } from './repository.js';
+import type { AgentsRepository } from './repository.js';
 import { toAgentDto, toAgentVersionDto } from './helpers.js';
+import { ValidationError } from '../../platform/errors.js';
 
 /**
  * A2 — agents service. Business logic for the Agents tab + Agent Editor.
@@ -48,11 +49,17 @@ export interface UpdateAgentInput {
   enabled?: boolean;
 }
 
-export class AgentsService {
-  private repo: AgentsRepository;
+export interface AgentsServiceDeps {
+  repo: AgentsRepository;
+  /** Resolves a provider adapter by id; rejects when its key isn't configured. */
+  llm: (provider: Provider) => Promise<LLMProvider>;
+}
 
-  constructor(private container: Container) {
-    this.repo = new AgentsRepository(container.db);
+export class AgentsService {
+  private readonly repo: AgentsRepository;
+
+  constructor(private readonly deps: AgentsServiceDeps) {
+    this.repo = deps.repo;
   }
 
   async list(workspaceId: string): Promise<Agent[]> {
@@ -152,7 +159,9 @@ export class AgentsService {
   ): Promise<AgentSkillLink[] | undefined> {
     const agent = await this.repo.getById(workspaceId, agentId);
     if (!agent) return undefined;
-    await this.repo.setSkills(agentId, skillIds);
+    const unique = [...new Set(skillIds)];
+    await this.assertSkillsInWorkspace(workspaceId, unique);
+    await this.repo.setSkills(agentId, unique);
     return this.skillLinks(agentId);
   }
 
@@ -165,10 +174,18 @@ export class AgentsService {
   ): Promise<AgentSkillLink[] | undefined> {
     const agent = await this.repo.getById(workspaceId, agentId);
     if (!agent) return undefined;
+    await this.assertSkillsInWorkspace(workspaceId, [skillId]);
     const existing = await this.repo.linkedSkills(agentId);
     const resolvedOrder = order ?? existing.length;
     await this.repo.linkSkill(agentId, skillId, resolvedOrder);
     return this.skillLinks(agentId);
+  }
+
+  /** Reject skill ids that don't belong to this workspace (422). */
+  private async assertSkillsInWorkspace(workspaceId: string, skillIds: string[]): Promise<void> {
+    if (skillIds.length === 0) return;
+    const found = await this.repo.countSkillsInWorkspace(workspaceId, skillIds);
+    if (found !== skillIds.length) throw new ValidationError('One or more skills do not exist in this workspace.');
   }
 
   /**
@@ -177,7 +194,7 @@ export class AgentsService {
    */
   async listModels(provider: Provider): Promise<ModelInfo[]> {
     try {
-      const llm = await this.container.llm(provider);
+      const llm = await this.deps.llm(provider);
       return await llm.listModels();
     } catch {
       return [];

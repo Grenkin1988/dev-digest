@@ -18,7 +18,7 @@
  * `parseChangedFiles` helper (which reads files diff-scoped under `root`).
  */
 import { parse, Lang, type SgNode } from '@ast-grep/napi';
-import { extname, join } from 'node:path';
+import { extname } from 'node:path';
 import { readContainedFile } from '../../platform/contained-read.js';
 
 import type { ExtractedReference, ExtractedSymbol } from '../codeindex/extract.js';

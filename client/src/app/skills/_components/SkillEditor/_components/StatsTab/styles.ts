@@ -1,0 +1,57 @@
+import type { CSSProperties } from "react";
+
+/** Co-located styles for the skill StatsTab. */
+export const s = {
+  tiles: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 18 } satisfies CSSProperties,
+  tile: {
+    background: "var(--bg-elevated)",
+    border: "1px solid var(--border)",
+    borderRadius: 9,
+    padding: 18,
+  } satisfies CSSProperties,
+  tileLabel: {
+    display: "flex",
+    alignItems: "center",
+    fontSize: 11,
+    fontWeight: 600,
+    letterSpacing: "0.05em",
+    textTransform: "uppercase",
+    color: "var(--text-muted)",
+    minHeight: 32,
+  } satisfies CSSProperties,
+  ring: { marginLeft: "auto" } satisfies CSSProperties,
+  tileValue: { fontSize: 30, fontWeight: 700, marginTop: 4 } satisfies CSSProperties,
+  unit: { fontSize: 14, fontWeight: 500, color: "var(--text-muted)" } satisfies CSSProperties,
+  panels: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 } satisfies CSSProperties,
+  panel: {
+    background: "var(--bg-elevated)",
+    border: "1px solid var(--border)",
+    borderRadius: 9,
+    padding: 18,
+  } satisfies CSSProperties,
+  panelTitle: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    fontSize: 11,
+    fontWeight: 600,
+    letterSpacing: "0.05em",
+    textTransform: "uppercase",
+    color: "var(--text-muted)",
+    marginBottom: 14,
+  } satisfies CSSProperties,
+  empty: { fontSize: 13, color: "var(--text-muted)" } satisfies CSSProperties,
+  agentRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    padding: "8px 12px",
+    marginBottom: 8,
+    border: "1px solid var(--border)",
+    borderRadius: 7,
+    background: "var(--bg-surface)",
+  } satisfies CSSProperties,
+  agentIcon: { color: "var(--accent)" } satisfies CSSProperties,
+  agentName: { flex: 1, fontSize: 13, fontWeight: 600 } satisfies CSSProperties,
+  basis: { fontSize: 12, color: "var(--text-muted)", marginTop: 14 } satisfies CSSProperties,
+} as const;

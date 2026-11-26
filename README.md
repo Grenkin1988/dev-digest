@@ -70,7 +70,8 @@ Each package has its own README with deeper diagrams:
 - **Add repository** — paste a repo URL; the server clones and indexes it.
 - **Import pull requests** — pull open PRs and their diff, commits, body, and linked issue.
 - **View diff** — GitHub-like diff in the browser.
-- **Agents** — two built-in reviewers (General + Security); create/edit your own (model + system prompt).
+- **Agents** — built-in reviewers (General, Security, Performance, Test Quality); create/edit your own (model + system prompt).
+- **Skills** — reusable, text-only instruction blocks (rubric / convention / security / custom). Create or edit them on `/skills`, import a `.md` or `.zip` (preview first, nothing executed), link and reorder them per agent (agent editor → Skills tab). Enabled + linked skills are added to the prompt in order and show up as their own block in the run trace.
 - **Run a review** — single-pass analysis returning structured findings (severity + score), with the grounding gate and repo-map context working from the start.
 
 ## Roadmap
@@ -107,6 +108,11 @@ This script:
 
 Open **http://localhost:3000**. Press **Ctrl-C** to stop the dev servers —
 Postgres keeps running (`docker compose down` to stop it).
+
+If `:3001` or `:3000` is already taken (typically a dev server orphaned by an earlier
+run whose terminal was closed), the script stops with the owning PID instead of
+starting a second API that dies with `EADDRINUSE`. Run `./scripts/dev.sh --kill-stale`
+to stop the leftover server and start fresh.
 
 Flags: `--no-seed` · `--no-client` · `--db-only` · `--help`.
 
@@ -148,6 +154,23 @@ path filter — full strategy in **[`TESTING.md`](TESTING.md)**.
 Server tests split by filename: `*.it.test.ts` are DB-backed (testcontainers
 Postgres); everything else is hermetic. The browser e2e flows live in
 [`e2e/`](e2e/README.md) and run deterministically (no LLM).
+
+### PR self-review gate
+
+Before a PR is opened, run `/pr-self-review` in Claude Code
+([`.claude/skills/pr-self-review`](.claude/skills/pr-self-review/SKILL.md)). It routes every changed
+file to the skills that own it (UI skills on `client/`, onion/backend skills on `server/` and
+`reviewer-core/`, security where relevant), runs lint and typecheck on the touched packages, and
+blocks the PR on any CRITICAL finding:
+
+- A Claude Code hook (`.claude/settings.json`) refuses `gh pr create|merge|ready` when the
+  report is missing, stale or blocking.
+- The skill posts the commit status `pr-self-review`. **One-time setup:** in GitHub →
+  Settings → Branches → branch protection for `main`, add `pr-self-review` as a *required status
+  check*. Without it, GitHub does not block the merge.
+- Optional reminder for manual pushes: `git config core.hooksPath .githooks`.
+
+The status is self-reported from your machine. It prevents accidents; it is not a security control.
 
 ## Troubleshooting
 

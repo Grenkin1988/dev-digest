@@ -7,7 +7,10 @@ import {
   GENERAL_REVIEWER_PROMPT,
   SECURITY_REVIEWER_PROMPT,
   PERFORMANCE_REVIEWER_PROMPT,
+  TEST_QUALITY_REVIEWER_PROMPT,
+  API_CONTRACT_REVIEWER_PROMPT,
 } from './seed-prompts.js';
+import { SEED_SKILLS } from './seed-skills.js';
 
 /** Default provider/model for the built-in reviewer agents. */
 const DEFAULT_PROVIDER = 'openrouter' as const;
@@ -19,11 +22,12 @@ const DEFAULT_MODEL = 'deepseek/deepseek-v4-flash';
  *
  * Seeds: default workspace + system user + membership, default settings,
  * demo repo (acme/payments-api), PR #482 with files/commits, a sample review
- * with a few findings, and the three built-in agents (General + Security +
- * Performance), all on the default openrouter/deepseek-v4-flash provider+model.
+ * with a few findings, the five built-in agents (General + Security +
+ * Performance + Test Quality + API Contract), all on the default openrouter/deepseek-v4-flash
+ * provider+model, and the starter skills (see seed-skills.ts) linked to them.
  *
- * Later milestones populate the other tables (skills, conventions, memory, eval,
- * …) once their features are built — they start empty here.
+ * Later milestones populate the other tables (conventions, memory, eval, …)
+ * once their features are built — they start empty here.
  */
 
 export const DEFAULT_WORKSPACE_NAME = 'default';
@@ -176,7 +180,7 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
     ]);
   }
 
-  // ---- built-in agents (the three starter presets) ----
+  // ---- built-in agents (the five starter presets) ----
   // Prompt bodies live in ./seed-prompts.ts (mirrored in docs/agent-prompts/*.md).
   const seedAgents: Array<typeof t.agents.$inferInsert> = [
     {
@@ -212,6 +216,28 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
       version: 1,
       createdBy: userId,
     },
+    {
+      workspaceId,
+      name: 'Test Quality Reviewer',
+      description: 'Checks test quality: uncovered branches, missing corner cases, over-mocking and flakes.',
+      provider: DEFAULT_PROVIDER,
+      model: DEFAULT_MODEL,
+      systemPrompt: TEST_QUALITY_REVIEWER_PROMPT,
+      enabled: true,
+      version: 1,
+      createdBy: userId,
+    },
+    {
+      workspaceId,
+      name: 'API Contract Reviewer',
+      description: 'Flags breaking API changes: removed or renamed fields and routes, response-shape drift, missing version bumps and deprecations.',
+      provider: DEFAULT_PROVIDER,
+      model: DEFAULT_MODEL,
+      systemPrompt: API_CONTRACT_REVIEWER_PROMPT,
+      enabled: true,
+      version: 1,
+      createdBy: userId,
+    },
   ];
   for (const a of seedAgents) {
     const [existing] = await db
@@ -219,6 +245,49 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
       .from(t.agents)
       .where(and(eq(t.agents.workspaceId, workspaceId), eq(t.agents.name, a.name)));
     if (!existing) await db.insert(t.agents).values(a);
+  }
+
+  // ---- starter skills (idempotent by name) + links ----
+  // Each skill gets version 1 in skill_versions. A skill is linked to its agent
+  // only when it was created in this run, so re-seeding never undoes a user's
+  // re-linking or reordering done in the UI.
+  const agentIdByName = new Map<string, string>();
+  for (const a of await db.select().from(t.agents).where(eq(t.agents.workspaceId, workspaceId))) {
+    agentIdByName.set(a.name, a.id);
+  }
+  const nextOrder = new Map<string, number>();
+  for (const sk of SEED_SKILLS) {
+    const [existing] = await db
+      .select()
+      .from(t.skills)
+      .where(and(eq(t.skills.workspaceId, workspaceId), eq(t.skills.name, sk.name)));
+    if (existing) continue;
+    const [row] = await db
+      .insert(t.skills)
+      .values({
+        workspaceId,
+        name: sk.name,
+        description: sk.description,
+        type: sk.type,
+        source: 'manual',
+        body: sk.body,
+        enabled: true,
+        version: 1,
+      })
+      .returning();
+    await db.insert(t.skillVersions).values({
+      skillId: row!.id,
+      version: 1,
+      body: sk.body,
+      description: sk.description,
+      message: 'Initial version',
+    });
+    const agentId = agentIdByName.get(sk.agent);
+    if (agentId) {
+      const order = nextOrder.get(agentId) ?? 0;
+      nextOrder.set(agentId, order + 1);
+      await db.insert(t.agentSkills).values({ agentId, skillId: row!.id, order });
+    }
   }
 
   return { workspaceId, userId };

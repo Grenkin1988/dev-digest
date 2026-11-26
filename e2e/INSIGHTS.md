@@ -13,6 +13,7 @@ Every entry belongs under one of the 7 sections below. Written by the
 ## Codebase Patterns
 
 ## Tool & Library Notes
+- **2026-11-25** — `agent-browser wait --text` is case-sensitive and matches the text as rendered, so assert the exact UI string (`Request changes`, not `request changes`). On failure, read the screenshot `e2e/test-results/<flow>-fail.png` before guessing. On Windows, `spawn agent-browser` fails with ENOENT because the npm `.cmd` shim is not spawnable; run locally with `AGENT_BROWSER_BIN` set to the `agent-browser-win32-x64.exe` inside the global package, and invoke `bash scripts/e2e.sh` directly (`pnpm e2e:hermetic` breaks on `..` under cmd). Evidence: `e2e/specs/04-pr-findings.flow.json:12` (wait --text step), `e2e/run.ts:40` (BIN).
 
 ## Recurring Errors & Fixes
 

@@ -1,6 +1,7 @@
 import { describe, it, expect, afterAll } from 'vitest';
 import { buildApp } from '../src/app.js';
 import { loadConfig } from '../src/platform/config.js';
+import { fakeAuth } from './fake-auth.js';
 import { MockGitHubClient, MockLLMProvider } from '../src/adapters/mocks.js';
 
 /**
@@ -22,7 +23,7 @@ describe('routes (no DB)', () => {
   it('POST /settings/test-connection (github) returns structured ConnTestResult', async () => {
     const app = await buildApp({
       config,
-      overrides: { github: new MockGitHubClient({ login: 'octocat' }) },
+      overrides: { auth: fakeAuth, github: new MockGitHubClient({ login: 'octocat' }) },
     });
     const res = await app.inject({
       method: 'POST',
@@ -41,6 +42,7 @@ describe('routes (no DB)', () => {
     const app = await buildApp({
       config,
       overrides: {
+        auth: fakeAuth,
         llm: { openai: new MockLLMProvider('openai', { models: [{ id: 'gpt-4.1', provider: 'openai' }] }) },
       },
     });
@@ -62,6 +64,17 @@ describe('routes (no DB)', () => {
     });
     expect(res.statusCode).toBe(422);
     expect(res.json().error.code).toBe('validation_error');
+    await app.close();
+  });
+
+  it('never leaks an unexpected error message in a 5xx body', async () => {
+    const app = await buildApp({ config });
+    app.get('/__boom', async () => {
+      throw new Error('relation "secret_table" does not exist');
+    });
+    const res = await app.inject({ method: 'GET', url: '/__boom' });
+    expect(res.statusCode).toBe(500);
+    expect(res.json()).toEqual({ error: { code: 'internal_error', message: 'Internal error' } });
     await app.close();
   });
 });

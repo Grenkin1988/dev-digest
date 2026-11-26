@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import type { Finding } from '@devdigest/shared';
-import { groundFindings, groundingSummary } from '../src/platform/grounding.js';
-import { parseUnifiedDiff } from '../src/adapters/git/diff-parser.js';
+import { groundFindings, groundingSummary } from '../src/index.js';
+// The unified-diff parser is a server adapter; borrow it like run.test.ts borrows the mocks.
+import { parseUnifiedDiff } from '../../server/src/adapters/git/diff-parser.js';
 
 const DIFF = `diff --git a/src/config.ts b/src/config.ts
 --- a/src/config.ts

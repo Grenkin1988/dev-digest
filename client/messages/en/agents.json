@@ -1,7 +1,10 @@
 {
   "card": {
     "noDescription": "No description",
-    "skillCount": "{count} skills"
+    "skillCount": "{count} skills",
+    "deleteLabel": "Delete agent",
+    "deleteTitle": "Delete agent “{name}”?",
+    "deleteBody": "This cannot be undone."
   },
   "list": {
     "breadcrumbLab": "Skills Lab",
@@ -61,6 +64,7 @@
     "modelHint": "Models are loaded dynamically from the provider's /models.",
     "modelEmptyHint": "No models loaded — set the {provider} API key in Settings → API Keys.",
     "modelSearch": "Search models…",
+    "optionSearch": "Search…",
     "systemPrompt": "System prompt",
     "systemPromptHint": "Loaded as the static system message. Enabled skills are appended below it.",
     "outputSchema": "Output schema",
@@ -91,7 +95,17 @@
     "title": "Skills",
     "enabledCount": "{linked} of {total} enabled",
     "filterPlaceholder": "Filter skills…",
-    "orderHint": "Order matters — earlier skills appear earlier in the assembled prompt. Toggle to attach."
+    "orderHint": "Order matters — earlier skills appear earlier in the assembled prompt. Drag to reorder.",
+    "empty": "No skills yet. Create one on the Skills page.",
+    "emptyCta": "Open Skills",
+    "noMatch": "No skills match your filter.",
+    "disabledGlobally": "disabled",
+    "disabledTitle": "Disabled on the Skills page — linked, but not added to the prompt",
+    "dragHandle": "Drag to reorder {name}",
+    "moveUp": "Move {name} up",
+    "moveDown": "Move {name} down",
+    "attach": "Attach {name}",
+    "loadError": "Could not load skills."
   },
   "mount": {
     "body": "Mount point for {owner}. The Agent Editor shell + tab routing are wired by A2 — {owner} renders this tab."

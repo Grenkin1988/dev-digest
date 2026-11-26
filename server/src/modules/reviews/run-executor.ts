@@ -1,13 +1,14 @@
-import type { Container } from '../../platform/container.js';
+import type { ReviewDeps } from './deps.js';
 import type { Provider, Review, RunTrace, UnifiedDiff } from '@devdigest/shared';
 import { reviewPullRequest, countBlockers } from '@devdigest/reviewer-core';
 import { RunLogger } from '../../platform/run-logger.js';
-import * as schema from '../../db/schema.js';
+import type { RepoRow } from '../../db/rows.js';
 import type { AgentRow } from '../../db/rows.js';
 import type { ReviewRepository, FindingRow, PullRow, ReviewRow } from './repository.js';
 import { REVIEW_STRATEGY } from './constants.js';
 import { taskLine } from './helpers.js';
 import { loadDiff } from './diff-loader.js';
+import { estimateTokens, formatSkillBlock } from '../skills/helpers.js';
 
 /** Thrown by a run when the user cancels it mid-flight (between map files). */
 export class RunCancelledError extends Error {
@@ -41,11 +42,11 @@ export type RunOutcome = {
  * review. Per-agent failures are isolated.
  */
 export class ReviewRunExecutor {
-  constructor(
-    private container: Container,
-    private repo: ReviewRepository,
-    private agents: Container['agentsRepo'],
-  ) {}
+  private readonly repo: ReviewRepository;
+
+  constructor(private readonly deps: ReviewDeps) {
+    this.repo = deps.repo;
+  }
 
   /**
    * Background execution of the queued agent runs (NOT awaited by the route).
@@ -55,7 +56,7 @@ export class ReviewRunExecutor {
   async executeRuns(
     workspaceId: string,
     pull: PullRow,
-    repo: typeof schema.repos.$inferSelect,
+    repo: RepoRow,
     jobs: { agent: AgentRow; runId: string }[],
     logger?: Logger,
   ): Promise<void> {
@@ -63,7 +64,7 @@ export class ReviewRunExecutor {
     // intent) is streamed into each target agent's Live Log and persisted into
     // each run's trace. Per-agent work below narrows it to a single run.
     const runLog = new RunLogger(
-      this.container.runBus,
+      this.deps.runBus,
       jobs.map((j) => j.runId),
       logger,
       { prId: pull.id },
@@ -88,13 +89,13 @@ export class ReviewRunExecutor {
         await this.repo
           .saveRunTrace(runId, this.traceFromBuffer(runId, pull, agent, '0/0 passed'))
           .catch(() => undefined);
-        this.container.runBus.complete(runId);
+        this.deps.runBus.complete(runId);
       }
     };
 
     let diff: UnifiedDiff;
     try {
-      diff = await runLog.step('Loading PR diff', () => loadDiff(this.container, this.repo, workspaceId, pull, repo), {
+      diff = await runLog.step('Loading PR diff', () => loadDiff(this.deps, this.repo, workspaceId, pull, repo), {
         kind: 'tool',
       });
     } catch (err) {
@@ -138,7 +139,7 @@ export class ReviewRunExecutor {
   private async runOneAgent(
     workspaceId: string,
     pull: PullRow,
-    repo: typeof schema.repos.$inferSelect,
+    repo: RepoRow,
     diff: UnifiedDiff,
     agent: AgentRow,
     runId: string,
@@ -157,7 +158,7 @@ export class ReviewRunExecutor {
       // key is missing — caught below and persisted as a failed run.)
       const llm = await runLog.step(
         `Resolving ${agent.provider} provider`,
-        () => this.container.llm(agent.provider as Provider),
+        () => this.deps.llm(agent.provider as Provider),
         { kind: 'tool' },
       );
 
@@ -183,6 +184,11 @@ export class ReviewRunExecutor {
 
       const task = taskLine(pull) + rankNote;
 
+      // Skills: linked to this agent AND globally enabled, in link order. They
+      // reach the prompt as the "## Skills / rules" section (and the trace's
+      // Skills block); disabled or unlinked skills contribute nothing.
+      const skills = await this.buildSkills(agent, runLog);
+
       // ---- Engine: assemble → single-pass → grounding -----------------------
       // The pure review pipeline lives in @devdigest/reviewer-core (shared with
       // the CI runner). The service owns only I/O: repo-intel context resolution
@@ -200,6 +206,8 @@ export class ReviewRunExecutor {
         ...(callersDigest ? { callers: callersDigest } : {}),
         // T3 — repo skeleton, same omit-when-empty contract.
         ...(repoMap ? { repoMap } : {}),
+        // Ordered skill blocks; omitted when the agent has none enabled.
+        ...(skills.length > 0 ? { skills } : {}),
         // PR author's description/body — untrusted; assemblePrompt wraps +
         // truncates it. Omitted when the PR has no body.
         ...(pull.body ? { prDescription: pull.body } : {}),
@@ -207,7 +215,7 @@ export class ReviewRunExecutor {
         sessionId: `${repo.owner}/${repo.name}#${pull.number}:${agent.name}`,
         onEvent: (e) => runLog.event(e.kind, e.msg, e.data),
         checkCancelled: () => {
-          if (this.container.runBus.isCancelled(runId)) throw new RunCancelledError();
+          if (this.deps.runBus.isCancelled(runId)) throw new RunCancelledError();
         },
       });
       const { tokensIn, tokensOut, costUsd, grounding } = outcome;
@@ -286,7 +294,7 @@ export class ReviewRunExecutor {
       };
       runLog.info('Run complete; trace persisted');
       await this.repo.saveRunTrace(runId, trace);
-      this.container.runBus.complete(runId);
+      this.deps.runBus.complete(runId);
 
       return { review, findings: findingRows, grounding, raw: outcome.review };
     } catch (err) {
@@ -310,7 +318,7 @@ export class ReviewRunExecutor {
       await this.repo
         .saveRunTrace(runId, this.traceFromBuffer(runId, pull, agent, '0/0 passed', Date.now() - start))
         .catch(() => undefined);
-      this.container.runBus.complete(runId);
+      this.deps.runBus.complete(runId);
       throw err;
     }
   }
@@ -335,7 +343,7 @@ export class ReviewRunExecutor {
     if (changedFiles.length === 0) return undefined;
     let rows;
     try {
-      rows = await this.container.repoIntel.getCallerSignatures(repoId, changedFiles, 10);
+      rows = await this.deps.repoIntel.getCallerSignatures(repoId, changedFiles, 10);
     } catch (err) {
       // Never let an enrichment break the run — surface only as a Live Log info.
       runLog.info(`callers digest: repoIntel failed — ${(err as Error).message}`);
@@ -368,13 +376,34 @@ export class ReviewRunExecutor {
     runLog: RunLogger,
   ): Promise<string | undefined> {
     try {
-      const map = await this.container.repoIntel.getRepoMap(repoId);
+      const map = await this.deps.repoIntel.getRepoMap(repoId);
       if (map.degraded || map.text.trim().length === 0) return undefined;
       runLog.info(`repo map: ${map.tokens} token(s) attached (cached=${map.cached})`);
       return map.text;
     } catch (err) {
       runLog.info(`repo map: repoIntel failed — ${(err as Error).message}`);
       return undefined;
+    }
+  }
+
+  /**
+   * The agent's enabled skills as prompt blocks (link order). Logs one
+   * `skills:` line when any are attached; nothing otherwise. Best-effort: a
+   * lookup failure must not fail the review, so it degrades to no skills.
+   */
+  private async buildSkills(agent: AgentRow, runLog: RunLogger): Promise<string[]> {
+    try {
+      const linked = await this.deps.agents.enabledLinkedSkills(agent.id);
+      if (linked.length === 0) return [];
+      const blocks = linked.map((l) => formatSkillBlock(l.skill));
+      const tokens = estimateTokens(blocks.join('\n\n'));
+      runLog.info(
+        `skills: ${linked.length} attached — ${linked.map((l) => l.skill.name).join(', ')} (~${tokens} tok)`,
+      );
+      return blocks;
+    } catch (err) {
+      runLog.error(`skills: could not load (${(err as Error).message}) — continuing without`);
+      return [];
     }
   }
 
@@ -391,7 +420,7 @@ export class ReviewRunExecutor {
     const changedFiles = diff.files.map((f) => f.path);
     if (changedFiles.length === 0) return '';
     try {
-      const ranks = await this.container.repoIntel.getFileRank(repoId, changedFiles);
+      const ranks = await this.deps.repoIntel.getFileRank(repoId, changedFiles);
       if (ranks.length === 0) return '';
       const hot = ranks.filter((r) => r.percentile >= 95);
       if (hot.length === 0) return '';
@@ -429,7 +458,7 @@ export class ReviewRunExecutor {
       raw_output: '',
       memory_pulled: [],
       specs_read: [],
-      log: this.container.runBus.buffer(runId).map((e) => ({ t: e.t, kind: e.kind, msg: e.msg })),
+      log: this.deps.runBus.buffer(runId).map((e) => ({ t: e.t, kind: e.kind, msg: e.msg })),
     };
   }
 }

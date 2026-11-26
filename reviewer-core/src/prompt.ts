@@ -48,7 +48,12 @@ const MAX_PR_DESCRIPTION_CHARS = 4000;
 export interface PromptParts {
   /** Agent's system prompt (trusted). */
   system: string;
-  /** Linked skill bodies (trusted-ish; community skills should be sanitized upstream). */
+  /**
+   * Ready-to-render skill blocks, already in link order (the caller formats each,
+   * e.g. `### Skill: name` + description + body). Skills are the user's own
+   * instructions, so they are TRUSTED and not `<untrusted>`-wrapped; imported
+   * skills are vetted by the user in the import preview before they are saved.
+   */
   skills?: string[];
   /** Relevant memory items (trusted, curated). */
   memory?: string[];

@@ -1,0 +1,9 @@
+#!/bin/sh
+# Optional reminder for pushes made outside Claude Code.
+# Enable once per clone:  git config core.hooksPath .githooks
+# Warns when the PR self-review report is missing, stale or blocking; never blocks the push
+# (the required GitHub status `pr-self-review` is what blocks the merge).
+root="$(git rev-parse --show-toplevel)" || exit 0
+command -v node >/dev/null 2>&1 || exit 0
+node "$root/.claude/skills/pr-self-review/scripts/gate.mjs" --mode=pre-push </dev/null
+exit 0

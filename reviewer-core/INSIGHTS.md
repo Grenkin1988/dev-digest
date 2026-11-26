@@ -11,6 +11,11 @@ Every entry belongs under one of the 7 sections below. Written by the
 ## What Doesn't Work
 
 ## Codebase Patterns
+- **2026-11-24** — reviewer-core tests aren't self-contained:
+  - `run.test.ts` borrows the server's mocks, and `grounding.test.ts` (moved here from `server/test`) borrows the server's unified-diff parser, both by relative path.
+  - `@devdigest/shared` resolves to `server/src/vendor/shared` (vitest alias).
+
+  So `pnpm test` here needs the `server/` tree next to it, but not its node_modules. `OpenRouterProvider` (the one `openai` SDK import) stays in the engine on purpose: the CI agent-runner uses reviewer-core without the server's adapters. Evidence: `reviewer-core/test/grounding.test.ts:5` (parseUnifiedDiff import), `reviewer-core/test/run.test.ts:3` (server mocks), `reviewer-core/vitest.config.ts:9` (shared alias), `reviewer-core/src/llm/openrouter.ts:1` (openai import).
 
 ## Tool & Library Notes
 

@@ -46,3 +46,9 @@ export const s = {
     gap: 8,
   } satisfies CSSProperties,
 } as const;
+
+export const sx = {
+  spinner: { color: "var(--accent)", animation: "ddspin 1s linear infinite" } satisfies CSSProperties,
+  shield: { color: "var(--crit)" } satisfies CSSProperties,
+  sectionHint: { fontSize: 12, color: "var(--text-muted)" } satisfies CSSProperties,
+} as const;

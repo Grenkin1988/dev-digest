@@ -49,3 +49,10 @@ export function latestReviewPerAgent(reviews: ReviewRecord[]): ReviewRecord[] {
   }
   return [...byAgent.values()];
 }
+
+/** "file:12" or "file:12–18" — where a finding points. */
+export function findingLocation(f: Pick<FindingRecord, "file" | "start_line" | "end_line">): string {
+  return f.end_line && f.end_line !== f.start_line
+    ? `${f.file}:${f.start_line}–${f.end_line}`
+    : `${f.file}:${f.start_line}`;
+}

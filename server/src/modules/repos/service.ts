@@ -1,7 +1,7 @@
-import type { Container } from '../../platform/container.js';
-import { type Repo } from '@devdigest/shared';
+import type { JobQueue } from '../../platform/jobs.js';
+import type { GitClient, Repo } from '@devdigest/shared';
 import { AppError, NotFoundError } from '../../platform/errors.js';
-import { RepoRepository } from './repository.js';
+import type { RepoRepository } from './repository.js';
 import { parseRepoUrl, canonicalCloneUrl, isValidRepoRef, toRepoDto } from './helpers.js';
 import { CLONE_JOB_KIND, CLONE_DEPTH } from './constants.js';
 import {
@@ -26,11 +26,17 @@ export interface CloneJobPayload {
   url: string;
 }
 
-export class RepoService {
-  private repo: RepoRepository;
+export interface RepoServiceDeps {
+  repo: RepoRepository;
+  jobs: JobQueue;
+  git: GitClient;
+}
 
-  constructor(private container: Container) {
-    this.repo = new RepoRepository(container.db);
+export class RepoService {
+  private readonly repo: RepoRepository;
+
+  constructor(private readonly deps: RepoServiceDeps) {
+    this.repo = deps.repo;
   }
 
   /**
@@ -39,7 +45,7 @@ export class RepoService {
    * then persists the resulting path + last_polled_at.
    */
   registerCloneJobHandler(): void {
-    this.container.jobs.register(CLONE_JOB_KIND, async (payload) => {
+    this.deps.jobs.register(CLONE_JOB_KIND, async (payload) => {
       await this.runCloneJob(payload as CloneJobPayload);
     });
   }
@@ -53,7 +59,7 @@ export class RepoService {
     if (!isValidRepoRef(owner, name)) {
       throw new AppError('invalid_repo_url', `Refusing to clone invalid repo '${owner}/${name}'`, 400);
     }
-    const { path } = await this.container.git.clone({ owner, name }, canonicalCloneUrl(owner, name), {
+    const { path } = await this.deps.git.clone({ owner, name }, canonicalCloneUrl(owner, name), {
       depth: CLONE_DEPTH,
     });
     await this.repo.updateClonePath(repoId, path);
@@ -66,7 +72,7 @@ export class RepoService {
     const workspaceId = await this.repo.workspaceIdFor(repoId);
     if (workspaceId) {
       try {
-        await this.container.jobs.enqueue(workspaceId, INDEX_JOB_KIND, {
+        await this.deps.jobs.enqueue(workspaceId, INDEX_JOB_KIND, {
           repoId,
           owner,
           name,
@@ -96,7 +102,7 @@ export class RepoService {
     if (existing) return { repo: toRepoDto(existing), created: false };
 
     const row = await this.repo.insert({ workspaceId, owner, name, fullName, createdBy: userId });
-    await this.container.jobs.enqueue(workspaceId, CLONE_JOB_KIND, {
+    await this.deps.jobs.enqueue(workspaceId, CLONE_JOB_KIND, {
       repoId: row.id,
       owner,
       name,
@@ -115,7 +121,7 @@ export class RepoService {
   async refresh(workspaceId: string, id: string): Promise<{ status: 'refreshing' }> {
     const repo = await this.repo.getById(workspaceId, id);
     if (!repo) throw new NotFoundError('Repo not found');
-    await this.container.jobs.enqueue(workspaceId, CLONE_JOB_KIND, {
+    await this.deps.jobs.enqueue(workspaceId, CLONE_JOB_KIND, {
       repoId: repo.id,
       owner: repo.owner,
       name: repo.name,
@@ -127,7 +133,7 @@ export class RepoService {
     // refresh fires before the new clone settles, it cheaply exits; if after,
     // it picks up the new HEAD.
     try {
-      await this.container.jobs.enqueue(workspaceId, REFRESH_JOB_KIND, {
+      await this.deps.jobs.enqueue(workspaceId, REFRESH_JOB_KIND, {
         repoId: repo.id,
         owner: repo.owner,
         name: repo.name,
@@ -136,6 +142,23 @@ export class RepoService {
       // No handler / transient enqueue failure — refresh button is best-effort.
     }
     return { status: 'refreshing' };
+  }
+
+  /** Clone status per repo for the workspace overview (`GET /workspace`). */
+  async cloneSummary(workspaceId: string) {
+    const rows = await this.repo.list(workspaceId);
+    return rows.map((r) => ({
+      id: r.id,
+      full_name: r.fullName,
+      clone_path: r.clonePath,
+      last_polled_at: r.lastPolledAt?.toISOString() ?? null,
+      cloned: Boolean(r.clonePath),
+    }));
+  }
+
+  /** True when `repoId` belongs to the workspace (tenancy guard for repo-scoped reads). */
+  async belongsToWorkspace(workspaceId: string, repoId: string): Promise<boolean> {
+    return Boolean(await this.repo.getById(workspaceId, repoId));
   }
 
   async remove(workspaceId: string, id: string): Promise<void> {

@@ -11,11 +11,14 @@ Reusable AI skills that provide specialized knowledge and workflows. Canonical l
 | [postgresql-table-design](postgresql-table-design/SKILL.md) | Backend | Postgres schema design, data types, indexing, constraints |
 | [next-best-practices](next-best-practices/SKILL.md) | Frontend | Next.js App Router, RSC boundaries, data fetching, optimization |
 | [react-best-practices](react-best-practices/SKILL.md) | Frontend | React anti-patterns, state management, hooks rules |
+| [onion-architecture](onion-architecture/SKILL.md) | Backend | Onion/ports-and-adapters layering for server modules: routes, services, Drizzle repositories, DI container, adapters |
+| [frontend-architecture](frontend-architecture/SKILL.md) | Frontend | UI architecture: where components, constants, helpers, business logic live; boundaries, barrels, App Router structure |
 | [react-testing-library](react-testing-library/SKILL.md) | Frontend | General-purpose React Testing Library guide with Vitest |
 | [zod](zod/SKILL.md) | Full-stack | Zod schema validation, parsing, error handling, type inference |
 | [typescript-expert](typescript-expert/SKILL.md) | Full-stack | Type-level programming, performance, tooling, migrations |
 | [security](security/SKILL.md) | Full-stack | OWASP Top 10:2025, auth, injection, uploads, secrets |
 | [mermaid-diagram](mermaid-diagram/SKILL.md) | Shared | Mermaid diagrams in markdown (flowcharts, sequence, ERD, …) |
+| [pr-self-review](pr-self-review/SKILL.md) | Shared | Pre-PR gate: routes the local diff to the owning skills + lint/typecheck; any CRITICAL blocks `gh pr create` and fails the `pr-self-review` GitHub status |
 
 ## What Are Skills?
 

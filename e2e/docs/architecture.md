@@ -3,7 +3,7 @@
 Deterministic browser flows (`@devdigest/e2e`) driven by the
 [agent-browser](https://github.com/vercel-labs/agent-browser) CDP CLI. They run on
 seeded demo data only, with no LLM calls and no API keys. Commands are in
-[`../CLAUDE.md`](../CLAUDE.md).
+[`../AGENTS.md`](../AGENTS.md).
 
 ## Pieces
 

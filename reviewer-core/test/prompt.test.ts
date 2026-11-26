@@ -80,3 +80,23 @@ describe('assemblePrompt — ## PR description', () => {
     expect((assembly.pr_description as string).length).toBe(4000);
   });
 });
+
+describe('assemblePrompt — skills section', () => {
+  const blocks = ['### Skill: first\n\nFIRST-BODY', '### Skill: second\n\nSECOND-BODY'];
+
+  it('renders skill blocks in the given order under "## Skills / rules", before the diff, unwrapped', () => {
+    const user = userOf({ system: 'sys', diff: 'DIFF', skills: blocks });
+    expect(user).toContain('## Skills / rules');
+    expect(user.indexOf('FIRST-BODY')).toBeLessThan(user.indexOf('SECOND-BODY'));
+    expect(user.indexOf('SECOND-BODY')).toBeLessThan(user.indexOf('## Diff to review'));
+    // skills are the user's own instructions: trusted, not fenced as untrusted data
+    expect(user).not.toMatch(/<untrusted source="skill/);
+  });
+
+  it('exposes the block in the trace assembly and omits the section when there are none', () => {
+    const { assembly } = assemblePrompt({ system: 'sys', diff: 'D', skills: blocks });
+    expect(assembly.skills).toContain('### Skill: second');
+    expect(userOf({ system: 'sys', diff: 'D', skills: [] })).not.toContain('## Skills / rules');
+    expect(assemblePrompt({ system: 'sys', diff: 'D' }).assembly.skills ?? null).toBeNull();
+  });
+});

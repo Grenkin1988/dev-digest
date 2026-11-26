@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { buildApp } from '../src/app.js';
 import { loadConfig } from '../src/platform/config.js';
+import { fakeAuth } from './fake-auth.js';
 import type { SecretsProvider } from '../src/domain/ports/secrets.js';
 import type { LLMProvider } from '../src/domain/ports/llm.js';
 import type { GitHubClient } from '../src/domain/ports/github.js';
@@ -36,6 +37,7 @@ describe('POST /settings/test-connection', () => {
     const app = await buildApp({
       config,
       overrides: {
+        auth: fakeAuth,
         secrets,
         llm: { openai: llm(async () => Promise.reject(new Error('401 Incorrect API key: sk-typo'))) },
       },
@@ -53,7 +55,7 @@ describe('POST /settings/test-connection', () => {
     const { store, secrets } = fakeSecrets();
     const app = await buildApp({
       config,
-      overrides: { secrets, llm: { openai: llm(async () => [{ id: 'gpt' }]) } },
+      overrides: { auth: fakeAuth, secrets, llm: { openai: llm(async () => [{ id: 'gpt' }]) } },
     });
     const body = await post(app, { provider: 'openai', key: 'sk-new' });
     expect(body.ok).toBe(true);
@@ -69,7 +71,7 @@ describe('POST /settings/test-connection', () => {
         throw new Error('Bad credentials');
       },
     } as unknown as GitHubClient;
-    const app = await buildApp({ config, overrides: { secrets, github } });
+    const app = await buildApp({ config, overrides: { auth: fakeAuth, secrets, github } });
     const body = await post(app, { provider: 'github', key: 'ghp_typo' });
     expect(body.ok).toBe(false);
     expect(secrets.set).not.toHaveBeenCalled();

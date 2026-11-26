@@ -1,11 +1,10 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
-import { RunRequest } from '@devdigest/shared';
+import { RunRequest, RunTrace } from '@devdigest/shared';
 import type { RunEvent } from '@devdigest/shared';
 import { getContext } from '../_shared/context.js';
 import { IdParams } from '../_shared/schemas.js';
 import { NotFoundError } from '../../platform/errors.js';
-import { ReviewService } from './service.js';
 
 /**
  * reviews module.
@@ -19,17 +18,20 @@ const FINDING_ACTIONS = ['accept', 'dismiss'] as const;
 export default async function reviewsRoutes(appBase: FastifyInstance) {
   const app = appBase.withTypeProvider<ZodTypeProvider>();
   const { container } = app;
-  const service = new ReviewService(container);
+  const service = container.reviewService;
 
   // ---- Run a review (manual trigger) -------------------------------
   // Tight per-route limit: each call can fan out to expensive LLM runs.
-  // Body stays a tolerant manual parse (both fields optional; empty body is OK).
+  // Both body fields are optional and an empty body is OK (defaults to {}).
   app.post(
     '/pulls/:id/review',
-    { schema: { params: IdParams }, config: { rateLimit: { max: 10, timeWindow: '1 minute' } } },
+    {
+      schema: { params: IdParams, body: RunRequest.default({}) },
+      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+    },
     async (req) => {
     const { workspaceId } = await getContext(container, req);
-    const body = RunRequest.parse(req.body ?? {});
+    const body = req.body;
     const targets = await service.resolveTargets(workspaceId, {
       ...(body.agentId !== undefined ? { agentId: body.agentId } : {}),
       ...(body.all !== undefined ? { all: body.all } : {}),
@@ -118,7 +120,7 @@ export default async function reviewsRoutes(appBase: FastifyInstance) {
   });
 
   // ---- Run trace (single document; A5 enriches with multi-agent/stats) ----
-  app.get('/runs/:id/trace', { schema: { params: IdParams } }, async (req) => {
+  app.get('/runs/:id/trace', { schema: { params: IdParams, response: { 200: RunTrace } } }, async (req) => {
     await getContext(container, req);
     const trace = await service.getRunTrace(req.params.id);
     if (!trace) throw new NotFoundError('Run trace not found');
@@ -126,6 +128,8 @@ export default async function reviewsRoutes(appBase: FastifyInstance) {
   });
 
   // ---- Reads --------------------------------------------------------------
+  // No response schema: `reviews.verdict` is free text in Postgres, and a
+  // strict enum on the way out would turn one odd legacy row into a 500.
   app.get('/pulls/:id/reviews', { schema: { params: IdParams } }, async (req) => {
     const { workspaceId } = await getContext(container, req);
     return service.reviewsForPull(workspaceId, req.params.id);

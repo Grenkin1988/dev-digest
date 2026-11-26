@@ -43,7 +43,7 @@ What makes the right column work: a concrete place, a concrete symptom, a concre
 
 - Generic best practices ("write tests", "handle errors", "use TypeScript strictly").
 - Chat replays or step-by-step narratives of what happened — extract the lesson, not the story.
-- Things already stated in `README.md`, any `CLAUDE.md`, `docs/` or `specs/` (e.g. "relative imports carry `.js`" as a bare rule is already in CLAUDE.md — only write it if you add a non-obvious symptom/fix).
+- Things already stated in `README.md`, any `AGENTS.md`, `docs/` or `specs/` (e.g. "relative imports carry `.js`" as a bare rule is already in AGENTS.md — only write it if you add a non-obvious symptom/fix).
 - Line numbers alone as the only anchor — always add the symbol name; lines drift.
 - Unverified guesses stated as fact — those go to **Open Questions**.
 - Secrets, tokens, credentials, personal data, customer content.

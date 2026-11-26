@@ -12,3 +12,8 @@ export function rowsToSettings(rows: SettingsRow[]): Settings {
   for (const r of rows) out[r.key] = r.value;
   return out as Settings;
 }
+
+/** Remove every occurrence of a candidate key from an error message. */
+export function redactKey(message: string, key: string | undefined): string {
+  return key ? message.split(key).join('[redacted]') : message;
+}

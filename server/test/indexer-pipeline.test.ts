@@ -18,13 +18,13 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { runFullIndex } from '../src/modules/repo-intel/pipeline/full.js';
 import { runIncremental } from '../src/modules/repo-intel/pipeline/incremental.js';
 import type { RepoIntelRepository } from '../src/modules/repo-intel/repository.js';
 import { INDEXER_VERSION } from '../src/modules/repo-intel/constants.js';
 import type { IndexState } from '../src/modules/repo-intel/types.js';
-import type { Container } from '../src/platform/container.js';
+import type { IndexerDeps } from '../src/modules/repo-intel/deps.js';
 
 // ---------------------------------------------------------------------------
 // In-memory repository stub — matches RepoIntelRepository's surface.
@@ -119,7 +119,7 @@ function makeRepoStub(opts: {
   };
 }
 
-// Minimal Container — only the fields the pipeline reads.
+// Minimal IndexerDeps — only the fields the pipeline reads.
 interface MiniGit {
   currentHead: () => Promise<string>;
   diffNameOnly: (
@@ -128,19 +128,19 @@ interface MiniGit {
     head: string,
   ) => Promise<string[]>;
 }
-function makeContainer(git: MiniGit): Container {
+function makeContainer(git: MiniGit): IndexerDeps {
   return {
     git,
     // T3 adapters — stubbed: empty graph (rank degrades to flat) + char/4 tokens.
     depgraph: { buildEdges: async () => [] },
     tokenizer: { count: (text: string) => Math.ceil(text.length / 4) },
-  } as unknown as Container;
+  } as unknown as IndexerDeps;
 }
 
 async function writeFileAt(root: string, rel: string, contents: string): Promise<void> {
   const full = join(root, rel);
-  const slash = full.lastIndexOf('/');
-  if (slash > 0) await mkdir(full.slice(0, slash), { recursive: true });
+  // dirname(), not lastIndexOf('/'): join() emits backslashes on Windows.
+  await mkdir(dirname(full), { recursive: true });
   await writeFile(full, contents);
 }
 
