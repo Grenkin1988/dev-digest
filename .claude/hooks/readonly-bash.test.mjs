@@ -115,6 +115,22 @@ test("regression: quoted flags are still flags", () => {
   }
 });
 
+test("regression: brace expansion and globs cannot smuggle flags", () => {
+  for (const cmd of [
+    `git grep {"-Osh -c id",} x`,
+    "git diff {--output=x.txt,}",
+    "git diff HEAD | sort {-ox.txt,}",
+    "cat *",
+    "ls ?",
+    "cat [a]",
+  ]) {
+    assert.equal(classify(cmd).allow, false, cmd);
+  }
+  // Quoted, they are plain text.
+  assert.equal(classify("git grep -n '{a,b}' -- server").allow, true);
+  assert.equal(classify("pnpm exec vitest run --exclude '**/*.it.test.ts'").allow, true);
+});
+
 test("regression: abbreviated long options are blocked", () => {
   for (const cmd of [
     "git grep --open='echo PWNED' AGENTS",

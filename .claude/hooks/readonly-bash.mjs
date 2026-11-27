@@ -7,7 +7,8 @@
 //   1. tokenize() parses the command the way bash would (quotes removed, so a quoted flag
 //      is still seen as a flag). Anything it can't model safely blocks: a backslash or `$`
 //      outside single quotes, backticks, `;`, a lone `&`, `||`, redirects, subshells,
-//      comments, newlines, unbalanced quotes.
+//      comments, newlines, unbalanced quotes, and unquoted `{ } * ? [` (brace expansion
+//      and globs could turn into argv words the guard never checked).
 //   2. The result is a list of `&&` segments, each a pipeline of argv arrays.
 //   3. Each argv is checked against a per-command rule. Long options are matched by
 //      PREFIX in both directions, because git and GNU getopt accept any unambiguous
@@ -88,7 +89,9 @@ export function tokenize(cmd) {
       segments.at(-1).push([]);
     } else if (ch === "\\") {
       return { error: "backslash outside quotes (use forward slashes in paths)" };
-    } else if ("$`;<>()#\r\n".includes(ch)) {
+    } else if ("$`;<>()#\r\n{}*?[".includes(ch)) {
+      // `{a,b}` brace expansion and `* ? [` globs would let bash produce argv words we never
+      // saw (e.g. `{--output=x,}` → `--output=x`). Quote them when they are meant literally.
       return { error: `'${ch === "\n" || ch === "\r" ? "newline" : ch}' outside quotes` };
     } else {
       token += ch;
