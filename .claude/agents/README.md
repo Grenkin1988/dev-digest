@@ -26,8 +26,10 @@ quoted flag is still a flag), checks each command's argv against per-command rul
 matches denied long options by prefix (git and GNU tools accept abbreviations). It blocks
 `$` and backslashes outside single quotes, unquoted `{ } * ? [` (brace expansion and globs), a lone `&`, `;`, `||`, redirects, subshells,
 newlines, and flags that run programs or write files (git `-O`/`--open-files-in-pager`/
-`--ext-diff`/`--textconv`/`--output`; sort `-o`/`-T`/`--compress-program`; pnpm/vitest
-`--fix`/`-u`/`--output*`/`--coverage`/`--config`); `node --test` takes paths only. Limit:
+`--ext-diff`/`--textconv`/`--output`; sort `-o`/`-T`/`--compress-program`). pnpm forwards
+args to eslint/tsc/vitest, so it is allowlisted instead: `pnpm lint` and `pnpm typecheck`
+take no args; `pnpm test` / `pnpm exec vitest run` take test paths plus `--exclude`, `-t`,
+`--testNamePattern` and `--reporter=default|dot|verbose|basic`; `node --test` takes paths only. Limit:
 pnpm, vitest and `node --test` run code already in the repo. The do-not-touch paths (`*/vendor/shared`, `client/src/vendor/ui`,
 `server/src/db/migrations`) are guarded by prompt rules.
 

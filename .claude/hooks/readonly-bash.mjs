@@ -16,7 +16,8 @@
 //
 // Allowed commands:
 //   cd <path> (alone) | git (diff|log|show|status|grep|blame|ls-files|rev-parse|merge-base) …
-//   ls|cat|head|tail|wc … | pnpm (lint|typecheck|test) … | pnpm exec vitest run …
+//   ls|cat|head|tail|wc … | pnpm lint | pnpm typecheck (no args)
+//   pnpm test / pnpm exec vitest run (paths + --exclude, -t, --testNamePattern, --reporter=<builtin>)
 //   node --test <paths>
 //   After `|`: head|tail|grep|wc|sort only.
 // Known limit: pnpm/vitest/node --test run repo scripts and test files; the guard can't see
@@ -25,14 +26,38 @@
 import { pathToFileURL } from "node:url";
 
 const GIT_SUBS = new Set(["diff", "log", "show", "status", "grep", "blame", "ls-files", "rev-parse", "merge-base"]);
-const PNPM_SCRIPTS = new Set(["lint", "typecheck", "test"]);
 const PLAIN_READERS = new Set(["ls", "cat", "head", "tail", "wc"]);
 const FILTERS = new Set(["head", "tail", "grep", "wc", "sort"]);
 
 // Long options (without `--`, lower-case) that run programs or write files.
 const GIT_DENY_LONG = ["output", "open-files-in-pager", "ext-diff", "textconv"];
 const SORT_DENY_LONG = ["output", "compress-program", "temporary-directory"];
-const PNPM_DENY_LONG = ["fix", "update", "output", "outputfile", "coverage", "config"];
+// pnpm forwards extra args to eslint / tsc / vitest, whose flag sets are too large to
+// deny-list (eslint -o, tsc --tsBuildInfoFile, vitest --globalSetup …). So pnpm uses an
+// ALLOWLIST: lint/typecheck take no args; test/vitest take test paths plus these flags.
+const VITEST_FLAGS_WITH_VALUE = new Set(["--exclude", "-t", "--testNamePattern"]);
+const VITEST_REPORTERS = new Set(["default", "dot", "verbose", "basic"]);
+
+/** @returns {string|null} reason to block */
+function checkVitestArgs(args) {
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a === "--" || !a.startsWith("-")) continue; // test path or name filter
+    const [flag, value] = a.includes("=") ? [a.slice(0, a.indexOf("=")), a.slice(a.indexOf("=") + 1)] : [a, undefined];
+    if (VITEST_FLAGS_WITH_VALUE.has(flag)) {
+      if (value === undefined) {
+        // The value is the next word (a filter, never executed). It must not look like a
+        // flag, or `-t --globalSetup=x` would hide a flag the CLI parses on its own.
+        if (i + 1 >= args.length || args[i + 1].startsWith("-")) return `${flag} needs a value`;
+        i++;
+      }
+      continue;
+    }
+    if (flag === "--reporter" && VITEST_REPORTERS.has(value)) continue;
+    return `vitest flag not allowed: ${a.slice(0, 40)} (allowed: paths, --exclude, -t, --testNamePattern, --reporter=default|dot|verbose|basic)`;
+  }
+  return null;
+}
 
 const block = (reason) => ({ allow: false, reason });
 
@@ -139,13 +164,13 @@ function checkCommand(argv, position) {
     case "git":
       if (!GIT_SUBS.has(args[0])) return `git subcommand not allowed: ${String(args[0]).slice(0, 40)}`;
       return checkFlags(args.slice(1), GIT_DENY_LONG, "O");
-    case "pnpm": {
-      let rest;
-      if (PNPM_SCRIPTS.has(args[0])) rest = args.slice(1);
-      else if (args[0] === "exec" && args[1] === "vitest" && args[2] === "run") rest = args.slice(3);
-      else return `pnpm command not allowed: ${args.slice(0, 3).join(" ").slice(0, 40)}`;
-      return checkFlags(rest, PNPM_DENY_LONG, "uc");
-    }
+    case "pnpm":
+      if (args[0] === "lint" || args[0] === "typecheck") {
+        return args.length === 1 ? null : `pnpm ${args[0]} takes no extra arguments`;
+      }
+      if (args[0] === "test") return checkVitestArgs(args.slice(1));
+      if (args[0] === "exec" && args[1] === "vitest" && args[2] === "run") return checkVitestArgs(args.slice(3));
+      return `pnpm command not allowed: ${args.slice(0, 3).join(" ").slice(0, 40)}`;
     case "node":
       if (args[0] !== "--test") return "only 'node --test <paths>' is allowed";
       return args.slice(1).some((a) => a.startsWith("-")) ? "node --test takes paths only" : null;

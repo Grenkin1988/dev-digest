@@ -148,6 +148,30 @@ test("regression: abbreviated long options are blocked", () => {
   }
 });
 
+test("regression: pnpm forwards args, so only allowlisted ones pass", () => {
+  for (const cmd of [
+    "pnpm lint -o src/index.ts",
+    "pnpm lint src",
+    "pnpm typecheck --incremental --tsBuildInfoFile src/x.ts",
+    "pnpm typecheck --generateTrace ../t",
+    "pnpm exec vitest run --globalSetup=x.mjs",
+    "pnpm test --reporter=./evil.mjs",
+    "pnpm exec vitest run -t --globalSetup=x.mjs",
+    "pnpm exec vitest run -t",
+    "pnpm --filter server test",
+  ]) {
+    assert.equal(classify(cmd).allow, false, cmd);
+  }
+  for (const cmd of [
+    "pnpm exec vitest run -t 'my test' src/a.test.ts",
+    "pnpm test --reporter=dot",
+    "pnpm test -- src/a.test.ts",
+    "pnpm exec vitest run --exclude='**/*.it.test.ts'",
+  ]) {
+    assert.equal(classify(cmd).allow, true, cmd);
+  }
+});
+
 test("read-only flags that look similar stay allowed", () => {
   for (const cmd of [
     "git log --oneline -5",
