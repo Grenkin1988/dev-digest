@@ -68,6 +68,38 @@ test("blocks chaining, redirects and substitution", () => {
 
 test("quoted text that merely mentions a command is not scanned", () => {
   assert.equal(classify("git grep \"rm -rf; x\" -- server").allow, true);
+  assert.equal(classify("git grep -n 'a\\b' -- server").allow, true);
+  assert.equal(classify("git grep -n \"say \\\"hi\\\"; x\" -- server").allow, true);
+});
+
+test("regression: escaped quotes cannot hide metacharacters", () => {
+  for (const cmd of [
+    String.raw`ls \' ; touch pwned ; \'`,
+    String.raw`ls \" ; rm -rf src ; \"`,
+    String.raw`cat \' > out.txt \'`,
+    String.raw`cd D:\Workspace`,
+  ]) {
+    assert.equal(classify(cmd).allow, false, cmd);
+  }
+});
+
+test("regression: flags that run programs or write files are blocked", () => {
+  for (const cmd of [
+    "git grep -Orm -l TODO",
+    "git grep -nOrm TODO",
+    "git grep --open-files-in-pager=rm TODO",
+    "git diff --ext-diff main",
+    "git log -p --textconv",
+    "git diff | sort --compress-program=sh -S 1",
+    "git diff | sort -T /tmp",
+    "git diff | sort --temporary-directory=/tmp",
+    "git diff | sort -no out.txt",
+    "pnpm test --reporter=json --outputFile=x.json",
+    "pnpm exec vitest run --outputFile.json=x.json",
+    "node --test --test-reporter-destination=x.txt .claude/hooks/",
+  ]) {
+    assert.equal(classify(cmd).allow, false, cmd);
+  }
 });
 
 test("blocks empty and non-string commands", () => {

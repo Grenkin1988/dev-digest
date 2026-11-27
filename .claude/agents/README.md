@@ -22,8 +22,10 @@ holds for researcher, planner, implementer and test-writer. The two read-only re
 architecture-reviewer and plan-verifier, are hook-guarded: each has a frontmatter
 `PreToolUse` hook on `Bash` that runs `.claude/hooks/readonly-bash.mjs`, which blocks any
 command that is not on a read-only allowlist. The hook is stricter than the plan asked: it
-also blocks a lone `&`, `${`, newlines and any `-o` flag, and `node --test` takes path
-arguments only. The do-not-touch paths (`*/vendor/shared`, `client/src/vendor/ui`,
+also blocks a lone `&`, `${`, newlines, a backslash outside quotes (use forward slashes in
+paths), and flags that run programs or write files (`-o`, `-O`, `-T`, `--output*`,
+`--open-files-in-pager`, `--ext-diff`, `--textconv`, `--compress-program`,
+`--test-reporter-destination`), and `node --test` takes path arguments only. The do-not-touch paths (`*/vendor/shared`, `client/src/vendor/ui`,
 `server/src/db/migrations`) are guarded by prompt rules.
 
 Two agents are reviewers: architecture-reviewer (architecture only) and plan-verifier
