@@ -184,6 +184,9 @@ export function classify(command) {
   if (typeof command !== "string" || command.trim() === "") {
     return block("missing or empty command");
   }
+  // Anywhere, even inside quotes: bash drops `\<newline>` inside "…" (line continuation),
+  // which would rebuild a flag the tokenizer saw split in two.
+  if (/[\r\n]/.test(command)) return block("contains a newline");
   const parsed = tokenize(command);
   if ("error" in parsed) return block(`contains ${parsed.error}`);
   for (const pipe of parsed.segments) {

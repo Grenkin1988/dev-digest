@@ -148,6 +148,19 @@ test("regression: abbreviated long options are blocked", () => {
   }
 });
 
+test("regression: newlines block even inside quotes (backslash-newline continuation)", () => {
+  for (const cmd of [
+    'git diff "--out\\\nput=/tmp/x"',
+    'pnpm test "\\\n--globalSetup=x.js"',
+    'git diff | sort "-\\\no" x',
+    'node --test "\\\n--eval=1"',
+    "git grep 'a\nb'",
+    'git grep "a\r\nb"',
+  ]) {
+    assert.equal(classify(cmd).allow, false, JSON.stringify(cmd));
+  }
+});
+
 test("regression: pnpm forwards args, so only allowlisted ones pass", () => {
   for (const cmd of [
     "pnpm lint -o src/index.ts",
