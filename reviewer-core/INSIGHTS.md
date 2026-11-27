@@ -16,6 +16,7 @@ Every entry belongs under one of the 7 sections below. Written by the
   - `@devdigest/shared` resolves to `server/src/vendor/shared` (vitest alias).
 
   So `pnpm test` here needs the `server/` tree next to it, but not its node_modules. `OpenRouterProvider` (the one `openai` SDK import) stays in the engine on purpose: the CI agent-runner uses reviewer-core without the server's adapters. Evidence: `reviewer-core/test/grounding.test.ts:5` (parseUnifiedDiff import), `reviewer-core/test/run.test.ts:3` (server mocks), `reviewer-core/vitest.config.ts:9` (shared alias), `reviewer-core/src/llm/openrouter.ts:1` (openai import).
+- **2026-11-27** — With an intent the engine requests `ScopedReview` (a local schema; the shared `Finding` contract is unchanged), then runs `groundFindings` → `applyScopeFilter` → score. `scope` is nullish and only an explicit `"out"` can be dropped, so a model that omits the tag (or a one-fixture mock) never loses findings. `groundFindings` and `reduceReviews` became generic over the finding type so the tag survives to the filter. Evidence: `reviewer-core/src/review/scope.ts:13` (ScopedFinding), `reviewer-core/src/review/run.ts:173` (scoped switch).
 
 ## Tool & Library Notes
 

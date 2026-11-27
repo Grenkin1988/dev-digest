@@ -15,9 +15,9 @@ import type { Finding, UnifiedDiff } from '@devdigest/shared';
 
 const FULL_FILE_KINDS = new Set(['secret_leak', 'lethal_trifecta', 'phantom', 'hook']);
 
-export interface GroundingResult {
-  kept: Finding[];
-  dropped: { finding: Finding; reason: string }[];
+export interface GroundingResult<F extends Finding = Finding> {
+  kept: F[];
+  dropped: { finding: F; reason: string }[];
 }
 
 /** Build a quick lookup of file → set of new-side line numbers covered by hunks. */
@@ -49,11 +49,14 @@ function rangeIntersects(lines: Set<number>, start: number, end: number): boolea
  * Apply the grounding gate to a set of findings against a unified diff.
  * Returns the kept findings and the dropped ones with reasons (for the trace).
  */
-export function groundFindings(findings: Finding[], diff: UnifiedDiff): GroundingResult {
+export function groundFindings<F extends Finding = Finding>(
+  findings: F[],
+  diff: UnifiedDiff,
+): GroundingResult<F> {
   const lineIndex = buildLineIndex(diff);
   const filesInDiff = new Set(diff.files.map((f) => f.path));
-  const kept: Finding[] = [];
-  const dropped: { finding: Finding; reason: string }[] = [];
+  const kept: F[] = [];
+  const dropped: { finding: F; reason: string }[] = [];
 
   for (const finding of findings) {
     const isFullFile = finding.kind ? FULL_FILE_KINDS.has(finding.kind) : false;
@@ -84,7 +87,7 @@ export function groundFindings(findings: Finding[], diff: UnifiedDiff): Groundin
 }
 
 /** Human-readable summary, e.g. "3/3 passed" used in run-trace stats. */
-export function groundingSummary(result: GroundingResult): string {
+export function groundingSummary(result: GroundingResult<Finding>): string {
   const total = result.kept.length + result.dropped.length;
   return `${result.kept.length}/${total} passed`;
 }

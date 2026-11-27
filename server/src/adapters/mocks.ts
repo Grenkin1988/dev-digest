@@ -33,6 +33,7 @@ import type {
   SecretKey,
 } from '@devdigest/shared';
 import { parseUnifiedDiff } from './git/diff-parser.js';
+import { RepoFileError, type RepoFileAtRef } from '../modules/intent/ports.js';
 
 /**
  * Deterministic MOCK adapters for tests/dev — NO real network. Each mirrors the
@@ -249,6 +250,22 @@ export interface MockGitOptions {
   head?: string;
   /** Head `currentHead()` returns AFTER `sync()` runs — simulates fetch+reset advancing HEAD. */
   syncedHead?: string;
+}
+
+/**
+ * Hermetic double for the module-local `RepoFileAtRef` port (`ContainerOverrides.repoFiles`).
+ */
+export class MockRepoFileAtRef implements RepoFileAtRef {
+  public reads: { sha: string; path: string }[] = [];
+  constructor(private files: Record<string, string | RepoFileError> = {}) {}
+
+  async read(_repo: RepoRef, sha: string, path: string): Promise<string> {
+    this.reads.push({ sha, path });
+    const hit = this.files[path];
+    if (hit === undefined) throw new RepoFileError('not_found', 'File not present at ref');
+    if (hit instanceof RepoFileError) throw hit;
+    return hit;
+  }
 }
 
 export class MockGitClient implements GitClient {

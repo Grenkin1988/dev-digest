@@ -57,3 +57,29 @@ export {
 // The single OpenAI-compatible structured provider (OpenRouter), shared by the
 // CI runner and the server's openrouter path. Owns session grouping + guards.
 export { OpenRouterProvider, type OpenRouterProviderOptions } from './llm/openrouter.js';
+
+// Intent Layer: quarantined classifier + scope tagging/filter.
+export { buildIntentPrompt } from './intent/prompt.js';
+export {
+  classifyIntent,
+  clampIntent,
+  type ClassifyIntentInput,
+  type ClassifyIntentResult,
+} from './intent/classify.js';
+export {
+  IntentClassifierOutput,
+  type IntentPromptInput,
+  type IntentIssueInput,
+  type IntentDocInput,
+  type IntentCommitInput,
+  type IntentFileInput,
+  type ReviewIntent,
+} from './intent/types.js';
+export {
+  applyScopeFilter,
+  isSerious,
+  ScopedFinding,
+  ScopedReview,
+  type ScopeFilterStats,
+  type ScopeFilterResult,
+} from './review/scope.js';

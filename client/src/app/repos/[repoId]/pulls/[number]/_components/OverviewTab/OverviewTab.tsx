@@ -5,11 +5,14 @@ import { useTranslations } from "next-intl";
 import { Icon, SectionLabel } from "@devdigest/ui";
 import type { PrDetail } from "@devdigest/shared";
 import { RunCostBadge } from "@/components/run-cost-badge";
+import { IntentCard } from "./_components/IntentCard";
 import { s } from "./styles";
 
 interface OverviewTabProps {
   pr: Pick<
     PrDetail,
+    | "id"
+    | "head_sha"
     | "body"
     | "cost_usd"
     | "tokens_in"
@@ -24,6 +27,10 @@ export function OverviewTab({ pr }: OverviewTabProps) {
   const t = useTranslations("runCost");
   return (
     <>
+      {/* Brief row: the Intent card first; the grid leaves room for the Blast radius card. */}
+      <div style={s.briefRow}>
+        <IntentCard prId={pr.id} headSha={pr.head_sha} />
+      </div>
       {/* Total of all completed runs, then the latest round alone — "—" until
           a run with usage data completes. */}
       <div style={s.costRow} title={t("overviewHint")} data-testid="overview-cost">

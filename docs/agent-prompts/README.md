@@ -38,12 +38,17 @@ receives exactly two messages:
 fixture / not for production / ignore this" never descope the review. You do not
 need to repeat any of this in your prompt — it is always there.
 
+When the PR has an intent (see *Stated intent and the scope filter* below), a fixed
+`SCOPE_RULE` (`prompt.ts:42`) is appended after the guard (`prompt.ts:117-119`).
+Without an intent, the system message is unchanged.
+
 **User message** = the task and all context, in this order, each untrusted block
-delimiter-wrapped (`prompt.ts:104-122`):
+delimiter-wrapped (`prompt.ts:137-159`):
 
 ```
 <task line, e.g. "Review PR #7 '…'">
 ## PR description        (untrusted, author-controlled, truncated to 4000 chars)
+## Stated intent (unverified author claims; derived, may be wrong)   (untrusted; only when the PR has an intent)
 ## Skills / rules        (the agent's linked + enabled skills, in link order; trusted, not wrapped)
 ## Relevant memory       (curated memory items)
 ## Repo skeleton         (untrusted, repo-derived)
@@ -55,6 +60,44 @@ delimiter-wrapped (`prompt.ts:104-122`):
 Sections with no content are omitted. Everything repo- or author-derived is wrapped
 in `<untrusted source="…">…</untrusted>` so the model can tell instructions
 (system) from data (user).
+
+## Stated intent and the scope filter
+
+The Intent Layer derives a PR's intent (summary, in scope, out of scope) with a
+separate cheap model before the review. You do not write anything for it in your
+agent prompt; this section explains what your agent will see.
+
+- **Classifier prompt** (`reviewer-core/src/intent/prompt.ts:29`, `buildIntentPrompt`).
+  Every source (title, description, linked issues, plan/spec docs, commits,
+  changed files with hunk headers) is wrapped in `<untrusted>`. It has two modes:
+  `author_description`, and `inferred_from_changes` when the PR has no real
+  description. Only in the second mode, and only for PRs under 50 changed lines,
+  it also gets an `## Added lines` block (`prompt.ts:67-68`): at most 40 added
+  lines, with secret-looking lines redacted
+  (`server/src/modules/intent/helpers.ts:293`, `addedLinesExcerpt`). Confidence is
+  computed in code, never by the model (`helpers.ts:362`, `computeConfidence`).
+- **Reviewer prompt.** The intent goes into the user message as
+  `## Stated intent (unverified author claims; derived, may be wrong)` right after
+  the PR description (`reviewer-core/src/prompt.ts:143`), and `SCOPE_RULE` is added
+  to the system message. The rule asks the model to tag each finding
+  `scope: "in" | "out"` and says scope never changes severity.
+- **The tag.** When an intent is present, findings use the `ScopedReview` schema
+  (`reviewer-core/src/review/scope.ts`). The tag is optional: a missing tag counts
+  as `in`. Like the rest of the output shape, it is described in the schema, not
+  in the prompt.
+- **The filter is code, not an instruction** (`scope.ts:74`, `applyScopeFilter`).
+  It runs after grounding (`reviewer-core/src/review/run.ts:236-245`), and only
+  when the intent came from the author's description, confidence is `high` or
+  `medium`, and the intent is not stale (`helpers.ts:378`, `shouldFilterByScope`).
+  - `in` (or no tag) → kept.
+  - `out`, not serious → dropped and counted in the run log.
+  - `out` and serious (`CRITICAL`, category `security`, or kind
+    `secret_leak` / `lethal_trifecta`; `scope.ts:50`, `isSerious`) → exactly one is
+    kept per review, the worst one. The others are listed in its rationale
+    ("Also out of the stated scope: …"), so nothing disappears silently.
+
+So an agent prompt must never tell the model to skip findings outside the PR's
+scope: report every real defect with its true severity and let the filter decide.
 
 ## The output schema is NOT in the prompt
 

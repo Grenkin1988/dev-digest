@@ -74,4 +74,5 @@ export {
   type ConventionList,
   type ConventionStatus,
 } from "./conventions";
-export { settingsKeys, conventionKeys, repoKeys, pullKeys, reviewKeys, agentKeys, skillKeys } from "./keys";
+export { usePrIntent, useDeriveIntent } from "./intent";
+export { settingsKeys, conventionKeys, intentKeys, repoKeys, pullKeys, reviewKeys, agentKeys, skillKeys } from "./keys";

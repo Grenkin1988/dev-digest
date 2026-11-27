@@ -40,7 +40,9 @@ const VERDICT_RANK: Record<string, number> = {
  * Merge N partial Reviews (one per mapped file/chunk) into a single Review:
  * concat findings, take the worst verdict, mean score, joined summaries.
  */
-export function reduceReviews(partials: Review[]): Review {
+export function reduceReviews<F extends Finding = Finding>(
+  partials: (Omit<Review, 'findings'> & { findings: F[] })[],
+): Omit<Review, 'findings'> & { findings: F[] } {
   if (partials.length === 1) return partials[0]!;
   const findings = partials.flatMap((p) => p.findings);
   let verdict: Review['verdict'] = 'approve';

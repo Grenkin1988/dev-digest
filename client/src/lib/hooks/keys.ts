@@ -38,6 +38,11 @@ export const reviewKeys = {
   trace: (runId: Id) => ["run-trace", runId] as const,
 };
 
+export const intentKeys = {
+  /** Stored PR intent + staleness (Overview → Intent card). */
+  forPr: (prId: Id) => ["pr-intent", prId] as const,
+};
+
 export const agentKeys = {
   all: ["agents"] as const,
   detail: (id: Id) => ["agent", id] as const,

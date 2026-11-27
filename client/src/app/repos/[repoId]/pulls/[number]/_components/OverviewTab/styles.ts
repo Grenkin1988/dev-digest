@@ -1,6 +1,12 @@
 import type { CSSProperties } from "react";
 
 export const s = {
+  briefRow: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+    gap: 16,
+    alignItems: "start",
+  } satisfies CSSProperties,
   costRow: {
     display: "flex",
     alignItems: "center",

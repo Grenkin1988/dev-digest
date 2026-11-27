@@ -58,5 +58,6 @@ user asks about FIRST — these are curated and may already answer it — then r
 - Writing or changing tests → read `TESTING.md`
 - Repo indexing → read `server/src/modules/repo-intel/README.md`
 - Agent prompt templates → read `docs/agent-prompts/`
+- After the `planner` subagent returns a plan → save it to `docs/plans/YYYY-MM-DD-<slug>.md` with status `draft` and add its row to `docs/plans/README.md` in the same turn, before showing it. "Show the plan before creating files" holds back implementation, not the plan file
 - Recording a finding into a module's `INSIGHTS.md` → use the `engineering-insights` skill (`.claude/skills/engineering-insights/`)
 - Before opening or merging a PR (or when the gate hook blocks `gh pr …`) → ask the user to run `/pr-self-review` (`.claude/skills/pr-self-review/`; auto-invocation is off, so only the user can start it); never bypass the gate unless the user explicitly asks

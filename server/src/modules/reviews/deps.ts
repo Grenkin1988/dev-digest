@@ -5,6 +5,16 @@ import type { AgentsRepository } from '../agents/repository.js';
 import type { ReviewRepository } from './repository.js';
 import type { CostEstimator } from './cost.js';
 
+/** What the intent module hands a review run (structural; the reviews module never imports it). */
+export interface ReviewIntentResolution {
+  /** Present when an intent exists to inject (`filter`: scope filtering enabled). */
+  intent?: { text: string; filter: boolean };
+  /** `intent: …` live-log line (kinds, refs and counts only). */
+  logLine: string;
+  /** Why the scope filter is off, when it is. */
+  filterOffReason?: string;
+}
+
 /**
  * Everything the review application layer (ReviewService + ReviewRunExecutor)
  * needs, injected by the composition root (`platform/container.ts`). Services
@@ -21,4 +31,9 @@ export interface ReviewDeps {
   repoIntel: RepoIntel;
   /** Live OpenRouter prices with the static table as fallback; never calls a model. */
   estimate: CostEstimator;
+  /**
+   * Resolve the PR's intent (reuse, or derive when absent). Best-effort: it
+   * never rejects, and returns undefined only when the PR is unknown.
+   */
+  intent: (workspaceId: string, prId: string) => Promise<ReviewIntentResolution | undefined>;
 }

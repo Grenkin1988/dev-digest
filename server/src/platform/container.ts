@@ -15,6 +15,7 @@ import { LocalSecretsProvider } from '../adapters/secrets/local.js';
 import { LocalNoAuthProvider } from '../adapters/auth/local.js';
 import { OctokitGitHubClient } from '../adapters/github/octokit.js';
 import { SimpleGitClient } from '../adapters/git/simple-git.js';
+import { GitFileAtRefReader } from '../adapters/git/file-at-ref.js';
 import { RipgrepCodeIndex } from '../adapters/codeindex/ripgrep.js';
 import { OpenAIProvider } from '../adapters/llm/openai.js';
 import { AnthropicProvider } from '../adapters/llm/anthropic.js';
@@ -29,6 +30,9 @@ import { SkillsService } from '../modules/skills/service.js';
 import { ConventionsRepository } from '../modules/conventions/repository.js';
 import { ConventionsService } from '../modules/conventions/service.js';
 import { resolveFeatureModel } from '../modules/settings/feature-models.js';
+import { IntentRepository } from '../modules/intent/repository.js';
+import { IntentService } from '../modules/intent/service.js';
+import type { RepoFileAtRef } from '../modules/intent/ports.js';
 import { ReviewRepository } from '../modules/reviews/repository.js';
 import type { RepoIntel } from '../modules/repo-intel/types.js';
 import { RepoIntelService } from '../modules/repo-intel/service.js';
@@ -45,6 +49,11 @@ import type { CostEstimator } from '../modules/reviews/cost.js';
 import { type DepGraph, DepCruiseGraph } from '../adapters/depgraph/index.js';
 import { type Tokenizer, TiktokenTokenizer } from '../adapters/tokenizer/index.js';
 
+/** Pino-compatible logger the Container hands to services (`info` is optional for test doubles). */
+export interface ContainerLogger extends PullsLogger {
+  info?: (obj: unknown, msg?: string) => void;
+}
+
 /**
  * DI container. One per app instance. Holds config, db, the JobRunner,
  * the SSE bus, and lazily-constructed adapters resolved through SecretsProvider.
@@ -52,17 +61,22 @@ import { type Tokenizer, TiktokenTokenizer } from '../adapters/tokenizer/index.j
  * Tests construct a container with `overrides` to inject mock adapters; the
  * Services depend on these interfaces, not the concrete classes.
  */
+
 export interface ContainerOverrides {
   secrets?: SecretsProvider;
   auth?: AuthProvider;
   github?: GitHubClient;
   git?: GitClient;
+  /** Read-a-file-at-a-commit port (intent module) — tests inject a hermetic double. */
+  repoFiles?: RepoFileAtRef;
   codeIndex?: CodeIndex;
   embedder?: Embedder;
   /** Pre-built providers by id (skip key lookup). */
   llm?: Partial<Record<'openai' | 'anthropic' | 'openrouter', LLMProvider>>;
   /** repo-intel facade (T1.1+) — tests inject mock RepoIntel implementations. */
   repoIntel?: RepoIntel;
+  /** Intent service — route tests inject one built over in-memory deps (no DB). */
+  intentService?: IntentService;
   /** repo-intel T3 adapters — only the indexer pipeline reads these. */
   depgraph?: DepGraph;
   tokenizer?: Tokenizer;
@@ -77,6 +91,7 @@ export class Container {
   readonly runBus: RunBus;
 
   private _git?: GitClient;
+  private _repoFiles?: RepoFileAtRef;
   private _github?: GitHubClient;
   private _codeIndex?: CodeIndex;
   private _embedder?: Embedder;
@@ -101,18 +116,19 @@ export class Container {
   private _agentsService?: AgentsService;
   private _skillsService?: SkillsService;
   private _conventionsService?: ConventionsService;
+  private _intentService?: IntentService;
   private _reviewService?: ReviewService;
   private _pullsService?: PullsService;
   private _settingsService?: SettingsService;
 
   /** App logger (Fastify's pino); a no-op until `buildApp` attaches one. */
-  readonly log: PullsLogger;
+  readonly log: ContainerLogger;
 
   constructor(
     config: AppConfig,
     db: Db,
     private overrides: ContainerOverrides = {},
-    log?: PullsLogger,
+    log?: ContainerLogger,
   ) {
     this.config = config;
     this.db = db;
@@ -161,6 +177,36 @@ export class Container {
     }));
   }
 
+  get intentService(): IntentService {
+    if (this.overrides.intentService) return this.overrides.intentService;
+    return (this._intentService ??= new IntentService({
+      repo: new IntentRepository(this.db),
+      getPullRef: async (ws, prId) => {
+        const pr = await this.reviewRepo.getPull(ws, prId);
+        if (!pr) return undefined;
+        const repo = await this.reviewRepo.getRepo(pr.repoId);
+        if (!repo) return undefined;
+        return {
+          id: pr.id,
+          number: pr.number,
+          headSha: pr.headSha,
+          repo: { id: repo.id, owner: repo.owner, name: repo.name },
+        };
+      },
+      pullDetail: (ws, prId) => this.pullsService.detail(ws, prId),
+      github: () => this.github(),
+      fetchPullHead: (repo, n) => this.git.fetchPullHead(repo, n),
+      repoFiles: this.repoFiles,
+      model: (ws) => resolveFeatureModel(this, ws, 'review_intent'),
+      llm: (provider) => this.llm(provider),
+      now: () => Date.now(),
+      log: {
+        info: (obj, msg) => this.log.info?.(obj, msg),
+        warn: (obj, msg) => this.log.warn(obj, msg),
+      },
+    }));
+  }
+
   get reviewService(): ReviewService {
     return (this._reviewService ??= new ReviewService({
       repo: this.reviewRepo,
@@ -170,6 +216,7 @@ export class Container {
       llm: (provider) => this.llm(provider),
       repoIntel: this.repoIntel,
       estimate: this.estimateCost,
+      intent: (ws, prId) => this.intentService.forReview(ws, prId),
     }));
   }
 
@@ -201,6 +248,13 @@ export class Container {
       getToken: () => this.secrets.get('GITHUB_TOKEN'),
     });
     return this._git;
+  }
+
+  /** `git show <sha>:<path>` against the clone (intent module's module-local port). */
+  get repoFiles(): RepoFileAtRef {
+    if (this.overrides.repoFiles) return this.overrides.repoFiles;
+    this._repoFiles ??= new GitFileAtRefReader((repo) => this.git.clonePathFor(repo));
+    return this._repoFiles;
   }
 
   get agentsRepo(): AgentsRepository {

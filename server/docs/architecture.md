@@ -13,10 +13,11 @@ adapters are listed in [`../README.md`](../README.md).
 | `src/modules/<name>/routes.ts` | One Fastify plugin per feature (`settings`, `repos`, `pulls`, `polling`, `workspace`, `agents`, `skills`, `reviews`, `repoIntel`) |
 | `src/modules/index.ts` | Static module registry; `app.ts:188` registers each entry |
 | `src/modules/reviews/` | Review runs: `service.ts` (API-facing), `run-executor.ts` (background execution), `deps.ts` (their injected deps), `repository/*.repo.ts` (SQL), `cost.ts` (pure cost math) |
+| `src/modules/intent/` | PR intent: `routes.ts` (`GET /pulls/:id/intent`, `POST /pulls/:id/intent/derive`), `service.ts` (`get`, `derive`, `forReview`, per-PR single-flight), `repository.ts` (owns `pr_intent`), `helpers.ts` (pure caps, reference extraction, confidence, log lines), `constants.ts`, `deps.ts`, `ports.ts` (module-local port `RepoFileAtRef`) |
 | `src/modules/pulls/` | PR import + reads: `service.ts` (sync gate, detail TTL, comments), `repository.ts` (SQL, batched upsert, transactional detail replace), `helpers.ts` (DTO mapping, severity rollup) |
 | `src/modules/repo-intel/` | Repo-intel facade `service.ts` over `indexer.ts`, `blast.ts`, `queries.ts`, `repo-map-reader.ts`; `disabled.ts` is the Null Object used when `REPO_INTEL_ENABLED` is off |
 | `src/platform/` | Cross-cutting infrastructure: DI `container.ts`, `config.ts`, `price-book.ts`, `sse.ts`, `jobs.ts`, `run-logger.ts` |
-| `src/adapters/` | Implementations behind the container (github, git, llm, secrets, embedder, …); `mocks.ts` for tests |
+| `src/adapters/` | Implementations behind the container (github, git, llm, secrets, embedder, …); `mocks.ts` for tests. `git/file-at-ref.ts` implements `RepoFileAtRef` |
 | `src/db/` | `schema.ts`, `client.ts`, `migrate.ts`, `seed.ts`, `migrations/` (do not hand-edit) |
 | `src/vendor/shared/` | Zod contracts shared with `reviewer-core` (do not hand-edit without coordination) |
 
@@ -66,6 +67,73 @@ sequenceDiagram
 
 - `ReviewService.runReview` (`src/modules/reviews/service.ts:107`) generates one `batchId` per request (`:125`). That batch is one "review round".
 - `ReviewRunExecutor` (`src/modules/reviews/run-executor.ts:43`) calls `reviewPullRequest` (`:190`) and stores `costUsd` and tokens on the run (`:244-248`). A failure in one agent doesn't affect the others.
+
+## PR intent (Intent Layer)
+
+```mermaid
+sequenceDiagram
+  participant EX as ReviewRunExecutor
+  participant IS as IntentService.forReview
+  participant DB as pr_intent
+  participant SRC as GitHub / local clone
+  participant LLM as classifier (review_intent model)
+  participant RC as reviewPullRequest
+  EX->>IS: step "Resolving PR intent"
+  IS->>DB: getForPull
+  alt row exists
+    DB-->>IS: stored intent (reused, or stale if head SHA differs)
+  else no row
+    IS->>SRC: detail, issues, docs at head (capped)
+    IS->>LLM: buildIntentPrompt + classifyIntent (one call)
+    IS->>IS: computeConfidence (code)
+    IS->>DB: upsertDerived
+  end
+  IS-->>EX: intent text + filter flag + log line (never throws)
+  EX->>RC: reviewPullRequest(intent)
+  RC-->>EX: findings after grounding and scope filter
+```
+
+- **Step.** The executor runs the step "Resolving PR intent" once per run, before the agents, and logs its line (`src/modules/reviews/run-executor.ts:108-118`). It passes `intent.intent` to each agent run (`:228`). The reviews module sees the intent only through the structural `ReviewIntentResolution` (`src/modules/reviews/deps.ts:9`), wired in the container (`src/platform/container.ts:219`).
+- **Best effort.** `forReview` catches every error and returns `outcome: 'unavailable'` (`src/modules/intent/service.ts:151-159`). A failure never fails the review.
+- **Routes.** `GET` reads the stored row with no LLM call (`src/modules/intent/service.ts:83`). `POST .../derive` re-derives and is limited to 10 calls per minute (`src/modules/intent/routes.ts:26-31`).
+- **Single-flight.** Concurrent derives for one PR share one promise (`service.ts:179-185`).
+- **Staleness.** An intent is stale when its stored head SHA is missing or differs from the PR head (`src/modules/intent/helpers.ts:373`). A stale intent is reused as context only; it is not re-derived during a review (`service.ts:109-114`).
+- **Mode.** `inferred_from_changes` when the body is empty or only template scaffolding with fewer than `MIN_AUTHOR_CHARS` (40) real characters; otherwise `author_description` (`helpers.ts:61-90`, `constants.ts:7`, `service.ts:205-207`).
+- **Confidence is computed in code, never by the model** (`helpers.ts:362-370`). No in-scope items gives `low`. In changes-only mode it is `medium` only with no missing context and a descriptive commit subject, else `low`. With a description it is `high` when an issue or doc was fetched and nothing is missing, else `medium`.
+- **Filter on/off.** The filter is on only for `author_description`, confidence not `low`, and not stale (`helpers.ts:378-384`). When off, the executor logs `scope filter: off (<reason>)` (`run-executor.ts:238-240`; reasons at `helpers.ts:387-395`).
+
+### Data sources and caps
+
+Caps are in `src/modules/intent/constants.ts`.
+
+| Source | Cap |
+|--------|-----|
+| Title | 300 chars (`:10`) |
+| Body | 10,000 chars (`:11`) |
+| Linked issues | 3, each body 10,000 chars (`:12-13`) |
+| Plan/spec docs | 3, each 10,000 chars (`:14-15`) |
+| Recorded but unfetched references | 10 (`:17`) |
+| Changed files | 150, largest changes first (`:18`, `helpers.ts:256-260`) |
+| Hunk headers | 5 per file, 160 chars each, 6,000 chars total (`:19-21`) |
+| Commits | 20, body 300 chars; merge commits skipped (`:22-23`, `helpers.ts:326-335`) |
+| PR template probe | 4 candidate paths, 10,000 chars (`:43-49`) |
+| Each GitHub or git read | 10 s timeout (`:26`) |
+
+- **Docs.** Only repo-relative markdown under `docs/` or `specs/` is read, at the PR head, through `git show <sha>:<path>` (`constants.ts:53`, `helpers.ts:105-109`, `src/adapters/git/file-at-ref.ts:33-52`). The adapter re-checks sha and path, rejects files over 100 KB, takes no shell, and never reads the working tree (`file-at-ref.ts:5-23`).
+- **No external URL is ever fetched.** `extractReferences` only fetches issues through the GitHub client. Any other URL is recorded as `host_not_allowlisted` with its query string and fragment removed (`helpers.ts:92-102`, `:183-201`). Docs outside the allowlist are recorded as `path_not_allowlisted` (`:164-168`).
+- **Small-PR excerpt.** In changes-only mode only, and only when the PR changes fewer than 50 lines, the classifier also gets up to 40 added (`+`) lines, 200 chars each. Lines that look like credentials become `[redacted]` (`helpers.ts:293-316`, `constants.ts:30-40`, `service.ts:257-268`).
+
+### Ports and wiring
+
+- `RepoFileAtRef` is a module-local port (`src/modules/intent/ports.ts:21`). The container builds `GitFileAtRefReader` over the clone path (`src/platform/container.ts:254-258`).
+- Tests swap both seams through `ContainerOverrides.repoFiles` and `ContainerOverrides.intentService` (`container.ts:71`, `:79`, `:181`).
+- `IntentService` receives only `IntentDeps` (`src/modules/intent/deps.ts:32`), never the container.
+
+### Logging and redaction
+
+- The live run log gets one line from `formatIntentLogLine`: provider, model, mode, confidence, source kinds, refs and counts only (`helpers.ts:469-490`). It never contains body, issue, doc or commit text.
+- The structured log carries the same metadata (`service.ts:322-340`).
+- On failure, only `safeErrorSummary` reaches the log: the first line of the message, capped at 120 chars, because provider errors can quote model output (`helpers.ts:502-507`, `service.ts:154-155`).
 
 ## Cost aggregation
 
