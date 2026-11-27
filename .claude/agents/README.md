@@ -21,11 +21,14 @@ update this table in the same change.
 holds for researcher, planner, implementer and test-writer. The two read-only reviewers,
 architecture-reviewer and plan-verifier, are hook-guarded: each has a frontmatter
 `PreToolUse` hook on `Bash` that runs `.claude/hooks/readonly-bash.mjs`, which blocks any
-command that is not on a read-only allowlist. The hook is stricter than the plan asked: it
-also blocks a lone `&`, `${`, newlines, a backslash outside quotes (use forward slashes in
-paths), and flags that run programs or write files (`-o`, `-O`, `-T`, `--output*`,
-`--open-files-in-pager`, `--ext-diff`, `--textconv`, `--compress-program`,
-`--test-reporter-destination`), and `node --test` takes path arguments only. The do-not-touch paths (`*/vendor/shared`, `client/src/vendor/ui`,
+command that is not on a read-only allowlist. It tokenizes the command like bash (so a
+quoted flag is still a flag), checks each command's argv against per-command rules, and
+matches denied long options by prefix (git and GNU tools accept abbreviations). It blocks
+`$` and backslashes outside single quotes, a lone `&`, `;`, `||`, redirects, subshells,
+newlines, and flags that run programs or write files (git `-O`/`--open-files-in-pager`/
+`--ext-diff`/`--textconv`/`--output`; sort `-o`/`-T`/`--compress-program`; pnpm/vitest
+`--fix`/`-u`/`--output*`/`--coverage`/`--config`); `node --test` takes paths only. Limit:
+pnpm, vitest and `node --test` run code already in the repo. The do-not-touch paths (`*/vendor/shared`, `client/src/vendor/ui`,
 `server/src/db/migrations`) are guarded by prompt rules.
 
 Two agents are reviewers: architecture-reviewer (architecture only) and plan-verifier

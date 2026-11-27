@@ -102,6 +102,51 @@ test("regression: flags that run programs or write files are blocked", () => {
   }
 });
 
+test("regression: quoted flags are still flags", () => {
+  for (const cmd of [
+    `git grep "--open-files-in-pager=echo hi;" x`,
+    `git log | sort "--output=x.txt"`,
+    `git diff "--output=x"`,
+    `git diff '--ext-diff'`,
+    `git grep "-Orm" TODO`,
+    `pnpm lint "--fix"`,
+  ]) {
+    assert.equal(classify(cmd).allow, false, cmd);
+  }
+});
+
+test("regression: abbreviated long options are blocked", () => {
+  for (const cmd of [
+    "git grep --open='echo PWNED' AGENTS",
+    "git diff | sort --out=s1.txt",
+    "git diff | sort -S 1 --compress=sh",
+    "git diff | sort --temp=/x",
+    "git show --textc",
+    "git diff --ext",
+    "git log --outp=x",
+    "pnpm exec vitest run --upd",
+    "pnpm test --coverage.reportsDirectory=src",
+    "pnpm exec vitest run --config=x.mjs",
+  ]) {
+    assert.equal(classify(cmd).allow, false, cmd);
+  }
+});
+
+test("read-only flags that look similar stay allowed", () => {
+  for (const cmd of [
+    "git log --oneline -5",
+    "git diff -U0 main",
+    "git diff --no-ext-diff main",
+    "git ls-files --others --exclude-standard",
+    "git grep -o foo -- server",
+    "pnpm exec vitest run --exclude '**/*.it.test.ts'",
+    "cd server && pnpm exec vitest run .it.test",
+    "git diff main...HEAD | sort | head -20",
+  ]) {
+    assert.equal(classify(cmd).allow, true, cmd);
+  }
+});
+
 test("blocks empty and non-string commands", () => {
   for (const cmd of ["", "   ", undefined, null, 42, {}]) {
     const r = classify(cmd);

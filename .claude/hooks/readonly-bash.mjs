@@ -3,127 +3,166 @@
 // Reads the hook JSON from stdin. Exit 0 = allow, exit 2 = block (stderr goes back to
 // the agent). Fails CLOSED: bad JSON, a missing or non-string command, or any crash blocks.
 //
-// Allowlist (every `&&`-separated segment must match):
-//   cd <path> | git (diff|log|show|status|grep|blame|ls-files|rev-parse|merge-base) …
+// How it works:
+//   1. tokenize() parses the command the way bash would (quotes removed, so a quoted flag
+//      is still seen as a flag). Anything it can't model safely blocks: a backslash or `$`
+//      outside single quotes, backticks, `;`, a lone `&`, `||`, redirects, subshells,
+//      comments, newlines, unbalanced quotes.
+//   2. The result is a list of `&&` segments, each a pipeline of argv arrays.
+//   3. Each argv is checked against a per-command rule. Long options are matched by
+//      PREFIX in both directions, because git and GNU getopt accept any unambiguous
+//      abbreviation (`--open` = `--open-files-in-pager`, `--out` = `--output`).
+//
+// Allowed commands:
+//   cd <path> (alone) | git (diff|log|show|status|grep|blame|ls-files|rev-parse|merge-base) …
 //   ls|cat|head|tail|wc … | pnpm (lint|typecheck|test) … | pnpm exec vitest run …
 //   node --test <paths>
-// A single `|` is allowed only into head|tail|grep|wc|sort.
-// Also blocked: a backslash outside quotes (so `\'` can't fake a quoted span; use forward
-// slashes in paths), and flags that run programs or write files (-o, -O, -T, --output*,
-// --open-files-in-pager, --ext-diff, --textconv, --compress-program,
-// --temporary-directory, --test-reporter-destination).
+//   After `|`: head|tail|grep|wc|sort only.
+// Known limit: pnpm/vitest/node --test run repo scripts and test files; the guard can't see
+// what those do. The agent can't write files, so it can only run code already in the repo.
 // Self-contained on purpose: no imports beyond node:*.
 import { pathToFileURL } from "node:url";
 
-const GIT_SUBS = "diff|log|show|status|grep|blame|ls-files|rev-parse|merge-base";
-const PATH_ARG = String.raw`(?:[\w.\\/:~@%+=,-]+|__Q__)`;
+const GIT_SUBS = new Set(["diff", "log", "show", "status", "grep", "blame", "ls-files", "rev-parse", "merge-base"]);
+const PNPM_SCRIPTS = new Set(["lint", "typecheck", "test"]);
+const PLAIN_READERS = new Set(["ls", "cat", "head", "tail", "wc"]);
+const FILTERS = new Set(["head", "tail", "grep", "wc", "sort"]);
 
-const SEGMENT_ALLOW = [
-  new RegExp(String.raw`^cd\s+${PATH_ARG}$`),
-  new RegExp(String.raw`^git\s+(?:${GIT_SUBS})(?:\s.*)?$`),
-  /^(?:ls|cat|head|tail|wc)(?:\s.*)?$/,
-  /^pnpm\s+(?:lint|typecheck|test)(?:\s.*)?$/,
-  /^pnpm\s+exec\s+vitest\s+run(?:\s.*)?$/,
-  // node --test takes only path-like arguments (no --eval / -p / script files).
-  /^node\s+--test(?:\s+(?!--?(?:e|p|eval|print|require|import)\b)[\w.\\/*@:=-]+)*$/,
-];
-const FILTER_ALLOW = /^(?:head|tail|grep|wc|sort)(?:\s.*)?$/;
-
-// Short-flag cluster containing a given letter, e.g. `-o x`, `-no x`, `-Orm`.
-const shortFlag = (letter) => new RegExp(String.raw`(?:^|\s)-[A-Za-z]*${letter}`);
-
-// Checked on the raw command: these execute even inside double quotes.
-const RAW_DENY = [
-  [/`/, "backticks"],
-  [/\$\(/, "command substitution $("],
-  [/\$\{/, "parameter expansion ${"],
-  [/[\r\n]/, "newlines"],
-];
-// Checked after quoted strings are stripped.
-const BARE_DENY = [
-  [/;/, "';'"],
-  [/\|\|/, "'||'"],
-  [/>/, "redirection '>'"],
-  [/</, "redirection '<'"],
-  [/(?:^|\s)--fix\b/, "--fix"],
-  [/(?:^|\s)-u(?:\s|$)/, "-u"],
-  [/(?:^|\s)--update\b/, "--update"],
-  // Prefix match: also catches --outputFile (vitest) and --output-directory.
-  [/(?:^|\s)--output/, "--output*"],
-  [/(?:^|\s)--test-reporter-destination/, "--test-reporter-destination"],
-  [shortFlag("o"), "-o (output file)"],
-  // git grep -O<cmd> / --open-files-in-pager=<cmd> runs an arbitrary program.
-  [shortFlag("O"), "-O (open files in pager)"],
-  [/(?:^|\s)--open-files-in-pager/, "--open-files-in-pager"],
-  // git diff/log/show can run external diff / textconv drivers.
-  [/(?:^|\s)--ext-diff/, "--ext-diff"],
-  [/(?:^|\s)--textconv/, "--textconv"],
-  // sort --compress-program=<prog> runs a program; -T / --temporary-directory writes files.
-  [/(?:^|\s)--compress-program/, "--compress-program"],
-  [shortFlag("T"), "-T (temporary directory)"],
-  [/(?:^|\s)--temporary-directory/, "--temporary-directory"],
-];
-
-/**
- * Replaces quoted strings with __Q__ so text that only mentions a command is not scanned.
- * Follows bash quoting: no escapes inside '…', `\` escapes the next char inside "…".
- * Returns null (caller blocks) for a backslash outside quotes, because `\'` / `\"` would
- * otherwise open a fake quoted span that hides `;` or `>` from the scan, or for an
- * unterminated quote.
- */
-export function stripQuoted(cmd) {
-  let out = "";
-  let i = 0;
-  while (i < cmd.length) {
-    const ch = cmd[i];
-    if (ch === "\\") return null;
-    if (ch === "'") {
-      const end = cmd.indexOf("'", i + 1);
-      if (end === -1) return null;
-      out += "__Q__";
-      i = end + 1;
-    } else if (ch === '"') {
-      let j = i + 1;
-      while (j < cmd.length && cmd[j] !== '"') j += cmd[j] === "\\" ? 2 : 1;
-      if (j >= cmd.length) return null;
-      out += "__Q__";
-      i = j + 1;
-    } else {
-      out += ch;
-      i += 1;
-    }
-  }
-  return out;
-}
+// Long options (without `--`, lower-case) that run programs or write files.
+const GIT_DENY_LONG = ["output", "open-files-in-pager", "ext-diff", "textconv"];
+const SORT_DENY_LONG = ["output", "compress-program", "temporary-directory"];
+const PNPM_DENY_LONG = ["fix", "update", "output", "outputfile", "coverage", "config"];
 
 const block = (reason) => ({ allow: false, reason });
+
+/**
+ * Bash-like tokenizer for the subset we allow.
+ * @returns {{segments: string[][][]} | {error: string}} segments[&&-part][pipe-part] = argv
+ */
+export function tokenize(cmd) {
+  const segments = [[[]]];
+  let token = "";
+  let inToken = false;
+  const cur = () => segments.at(-1).at(-1);
+  const endToken = () => {
+    if (inToken) cur().push(token);
+    token = "";
+    inToken = false;
+  };
+
+  for (let i = 0; i < cmd.length; i++) {
+    const ch = cmd[i];
+    if (ch === " " || ch === "\t") {
+      endToken();
+    } else if (ch === "'") {
+      const end = cmd.indexOf("'", i + 1);
+      if (end === -1) return { error: "unbalanced quote" };
+      token += cmd.slice(i + 1, end);
+      inToken = true;
+      i = end;
+    } else if (ch === '"') {
+      let j = i + 1;
+      for (; j < cmd.length && cmd[j] !== '"'; j++) {
+        const c = cmd[j];
+        if (c === "$" || c === "`") return { error: "'$' or backtick inside double quotes" };
+        if (c === "\\" && j + 1 < cmd.length) {
+          const next = cmd[j + 1];
+          // Inside "…" bash only unescapes these; any other backslash stays literal.
+          token += '"\\$`'.includes(next) ? next : c + next;
+          j++;
+        } else {
+          token += c;
+        }
+      }
+      if (j >= cmd.length) return { error: "unbalanced quote" };
+      inToken = true;
+      i = j;
+    } else if (ch === "&") {
+      if (cmd[i + 1] !== "&") return { error: "lone '&'" };
+      endToken();
+      segments.push([[]]);
+      i++;
+    } else if (ch === "|") {
+      if (cmd[i + 1] === "|") return { error: "'||'" };
+      endToken();
+      segments.at(-1).push([]);
+    } else if (ch === "\\") {
+      return { error: "backslash outside quotes (use forward slashes in paths)" };
+    } else if ("$`;<>()#\r\n".includes(ch)) {
+      return { error: `'${ch === "\n" || ch === "\r" ? "newline" : ch}' outside quotes` };
+    } else {
+      token += ch;
+      inToken = true;
+    }
+  }
+  endToken();
+  if (segments.some((pipe) => pipe.some((argv) => argv.length === 0))) {
+    return { error: "empty command around '&&' or '|'" };
+  }
+  return { segments };
+}
+
+/** True if `arg` is a long option that is, or abbreviates, or extends a denied name. */
+function deniedLong(arg, names) {
+  if (!arg.startsWith("--") || arg === "--") return false;
+  const name = arg.slice(2).split("=")[0].toLowerCase();
+  return names.some((n) => n.startsWith(name) || name.startsWith(n));
+}
+
+/** True if `arg` is a short-option cluster (e.g. `-nO`) containing one of `letters`. */
+function deniedShort(arg, letters) {
+  if (!/^-[^-]/.test(arg)) return false;
+  return [...letters].some((l) => arg.slice(1).includes(l));
+}
+
+function checkFlags(args, longNames, shortLetters) {
+  for (const a of args) {
+    if (deniedLong(a, longNames) || deniedShort(a, shortLetters)) return `flag not allowed: ${a.slice(0, 40)}`;
+  }
+  return null;
+}
+
+/** @returns {string|null} reason to block, or null if this argv is allowed */
+function checkCommand(argv, position) {
+  const [cmd, ...args] = argv;
+  if (position > 0) {
+    if (!FILTERS.has(cmd)) return `pipe target not allowed: ${cmd.slice(0, 40)}`;
+    return cmd === "sort" ? checkFlags(args, SORT_DENY_LONG, "oT") : null;
+  }
+  if (PLAIN_READERS.has(cmd)) return null;
+  switch (cmd) {
+    case "cd":
+      return args.length === 1 && !args[0].startsWith("-") ? null : "cd takes exactly one path";
+    case "git":
+      if (!GIT_SUBS.has(args[0])) return `git subcommand not allowed: ${String(args[0]).slice(0, 40)}`;
+      return checkFlags(args.slice(1), GIT_DENY_LONG, "O");
+    case "pnpm": {
+      let rest;
+      if (PNPM_SCRIPTS.has(args[0])) rest = args.slice(1);
+      else if (args[0] === "exec" && args[1] === "vitest" && args[2] === "run") rest = args.slice(3);
+      else return `pnpm command not allowed: ${args.slice(0, 3).join(" ").slice(0, 40)}`;
+      return checkFlags(rest, PNPM_DENY_LONG, "uc");
+    }
+    case "node":
+      if (args[0] !== "--test") return "only 'node --test <paths>' is allowed";
+      return args.slice(1).some((a) => a.startsWith("-")) ? "node --test takes paths only" : null;
+    default:
+      return `command not on the read-only allowlist: ${cmd.slice(0, 40)}`;
+  }
+}
 
 /** @returns {{allow: boolean, reason: string}} */
 export function classify(command) {
   if (typeof command !== "string" || command.trim() === "") {
     return block("missing or empty command");
   }
-  for (const [re, name] of RAW_DENY) {
-    if (re.test(command)) return block(`contains ${name}`);
-  }
-  const bare = stripQuoted(command);
-  if (bare === null) {
-    return block("contains a backslash outside quotes or an unbalanced quote (use forward slashes in paths)");
-  }
-  for (const [re, name] of BARE_DENY) {
-    if (re.test(bare)) return block(`contains ${name}`);
-  }
-
-  for (const segment of bare.split("&&")) {
-    const parts = segment.split("|").map((p) => p.trim());
-    // A lone `&` (background job) survives the `&&` split.
-    if (parts.some((p) => p === "" || p.includes("&"))) return block("empty segment or '&'");
-    const [head, ...filters] = parts;
-    if (!SEGMENT_ALLOW.some((re) => re.test(head))) {
-      return block(`command not on the read-only allowlist: ${head.slice(0, 60)}`);
-    }
-    for (const f of filters) {
-      if (!FILTER_ALLOW.test(f)) return block(`pipe target not allowed: ${f.slice(0, 60)}`);
+  const parsed = tokenize(command);
+  if ("error" in parsed) return block(`contains ${parsed.error}`);
+  for (const pipe of parsed.segments) {
+    if (pipe[0][0] === "cd" && pipe.length > 1) return block("cd cannot be piped");
+    for (let p = 0; p < pipe.length; p++) {
+      const reason = checkCommand(pipe[p], p);
+      if (reason) return block(reason);
     }
   }
   return { allow: true, reason: "ok" };
