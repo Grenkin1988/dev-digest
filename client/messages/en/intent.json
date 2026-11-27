@@ -1,0 +1,50 @@
+{
+  "title": "Intent",
+  "derive": "Derive intent",
+  "rederive": "Re-derive",
+  "deriving": "Deriving…",
+  "derivingHint": "Reading title, description, linked issues, files…",
+  "retry": "Retry",
+  "loading": "Loading intent…",
+  "notDerived": "No intent yet.",
+  "notDerivedHint": "It is derived automatically when a review starts.",
+  "inScope": "In scope",
+  "outOfScope": "Out of scope",
+  "noItems": "Nothing listed",
+  "sources": "Sources",
+  "sourceKind": {
+    "title": "title",
+    "body": "description",
+    "issue": "issue {ref}",
+    "doc": "{ref}",
+    "files": "{ref} files",
+    "hunks": "{ref} hunks",
+    "commits": "{ref} commits",
+    "added_lines": "{ref} added"
+  },
+  "confidenceLabel": "{level} confidence",
+  "confidence": {
+    "high": "HIGH",
+    "medium": "MEDIUM",
+    "low": "LOW"
+  },
+  "lowConfidenceHint": "Low confidence: out-of-scope filtering is off for reviews.",
+  "inferredBadge": "Inferred from changes",
+  "inferredBanner": "Inferred from changes, no author description. Check that this matches the PR.",
+  "stale": "STALE",
+  "staleHint": "Derived at {derived}, PR head is now {head}. Re-derive to update.",
+  "staleReviewNote": "Reviews use it for context only (no filtering) until re-derived.",
+  "missingTitle": "Missing context (confidence lowered):",
+  "missingReason": {
+    "not_found": "not found or no access",
+    "unreachable": "could not be reached",
+    "no_token": "no GitHub token configured",
+    "timeout": "timed out",
+    "not_present_at_head": "not present at head",
+    "path_not_allowlisted": "path not allowed",
+    "too_large": "too large",
+    "host_not_allowlisted": "host not allowlisted"
+  },
+  "error": "Could not derive intent: {message}",
+  "model": "model: {model}"
+}

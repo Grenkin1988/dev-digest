@@ -10,6 +10,13 @@ import { Review as ReviewSchema } from '@devdigest/shared';
 import { assemblePrompt } from '../prompt.js';
 import { groundFindings, groundingSummary } from '../grounding.js';
 import { reduceReviews, scoreFromFindings, sliceDiff } from './reduce.js';
+import {
+  applyScopeFilter,
+  ScopedReview,
+  type ScopedFinding,
+  type ScopeFilterStats,
+} from './scope.js';
+import type { ReviewIntent } from '../intent/types.js';
 
 /**
  * reviewPullRequest — the review engine entry point.
@@ -71,6 +78,13 @@ export interface ReviewInput {
   /** PR author's description/body (untrusted; truncated + delimiter-wrapped in
       the prompt). Empty/undefined → section omitted. */
   prDescription?: string;
+  /**
+   * Derived PR intent (Intent Layer). Rendered as an unverified-claims section;
+   * when present the model also tags each finding `in`/`out` of scope and,
+   * if `filter` is true, non-serious out-of-scope findings are dropped after
+   * grounding. Undefined → behaviour is byte-identical to before.
+   */
+  intent?: ReviewIntent;
   /** Task framing line, e.g. "Review PR #482 …". */
   task?: string;
   /** Override the structured-output retry budget. */
@@ -110,6 +124,8 @@ export interface ReviewOutcome {
   costUsd: number | null;
   /** Joined raw model outputs (for the run trace). */
   raw: string;
+  /** Scope-filter stats; null when no intent was given. */
+  scopeFilter: ScopeFilterStats | null;
 }
 
 function selectMode(strategy: ReviewStrategy, diff: UnifiedDiff, threshold: number): ReviewMode {
@@ -135,6 +151,7 @@ export async function reviewPullRequest(input: ReviewInput): Promise<ReviewOutco
     callers: input.callers,
     repoMap: input.repoMap,
     prDescription: input.prDescription,
+    intent: input.intent?.text,
     task: input.task,
   };
 
@@ -153,7 +170,8 @@ export async function reviewPullRequest(input: ReviewInput): Promise<ReviewOutco
       : `Reviewing ${input.diff.files.length} changed file(s) in one pass`,
   );
 
-  const partials: Review[] = [];
+  const scoped = input.intent !== undefined;
+  const partials: ScopedReview[] = [];
   let tokensIn = 0;
   let tokensOut = 0;
   let costUsd: number | null = 0;
@@ -171,21 +189,42 @@ export async function reviewPullRequest(input: ReviewInput): Promise<ReviewOutco
     );
     const a = assemblePrompt({ ...promptParts, diff: chunk.diffText });
     if (mode === 'single-pass') assembly = a.assembly;
-    const res = await input.llm.completeStructured<Review>({
-      model: input.model,
-      schema: ReviewSchema,
-      schemaName: 'Review',
-      messages: a.messages,
-      maxRetries,
-      ...(input.sessionId ? { sessionId: input.sessionId } : {}),
-    });
+    // With an intent the model also tags each finding's scope; without one the
+    // request is exactly the plain Review schema (findings are tagged 'in' so the
+    // rest of the pipeline is typed once; the tag is stripped before returning).
+    let partial: ScopedReview;
+    let res: { tokensIn: number; tokensOut: number; costUsd: number | null; raw: string };
+    if (scoped) {
+      const r = await input.llm.completeStructured<ScopedReview>({
+        model: input.model,
+        schema: ScopedReview,
+        schemaName: 'ScopedReview',
+        messages: a.messages,
+        maxRetries,
+        ...(input.sessionId ? { sessionId: input.sessionId } : {}),
+      });
+      partial = r.data;
+      res = r;
+    } else {
+      const r = await input.llm.completeStructured<Review>({
+        model: input.model,
+        schema: ReviewSchema,
+        schemaName: 'Review',
+        messages: a.messages,
+        maxRetries,
+        ...(input.sessionId ? { sessionId: input.sessionId } : {}),
+      });
+      partial = { ...r.data, findings: r.data.findings.map((f) => ({ ...f, scope: 'in' as const })) };
+      res = r;
+    }
     tokensIn += res.tokensIn;
     tokensOut += res.tokensOut;
     costUsd = costUsd == null || res.costUsd == null ? null : costUsd + res.costUsd;
     raws.push(res.raw);
-    partials.push(res.data);
-    emit('result', `${chunk.label}: ${res.data.findings.length} candidate finding(s)`);
+    partials.push(partial);
+    emit('result', `${chunk.label}: ${partial.findings.length} candidate finding(s)`);
   }
+
 
   const merged = reduceReviews(partials);
   emit(
@@ -201,13 +240,27 @@ export async function reviewPullRequest(input: ReviewInput): Promise<ReviewOutco
   }
   emit('result', `Citation grounding: ${grounding}`);
 
-  // Score is derived from the findings that SURVIVED grounding (not the model's
-  // self-reported number, and not the pre-grounding set) so the score, the
-  // findings list, and the deterministic event always agree.
+  // Scope filter — AFTER grounding (an ungrounded finding must never be kept as
+  // a "serious signal"), BEFORE scoring. Disabled/absent → only strips the tag.
+  const filtered = applyScopeFilter(ground.kept, { enabled: scoped && input.intent!.filter });
+  const scopeFilter = scoped ? filtered.stats : null;
+  if (scopeFilter?.applied) {
+    emit(
+      'info',
+      `scope filter: ${scopeFilter.dropped} out-of-scope finding(s) dropped` +
+        (scopeFilter.keptSerious
+          ? `, 1 serious kept (${scopeFilter.keptSerious.severity} ${scopeFilter.keptSerious.category} ${scopeFilter.keptSerious.file}:${scopeFilter.keptSerious.start_line})`
+          : ''),
+    );
+  }
+
+  // Score is derived from the findings that SURVIVED grounding and the scope
+  // filter (not the model's self-reported number) so the score, the findings
+  // list, and the deterministic event always agree.
   return {
-    review: { ...merged, findings: ground.kept, score: scoreFromFindings(ground.kept) },
+    review: { ...merged, findings: filtered.kept, score: scoreFromFindings(filtered.kept) },
     grounding,
-    dropped: ground.dropped,
+    dropped: ground.dropped.map((d) => ({ finding: stripScopeTag(d.finding), reason: d.reason })),
     mode,
     assembly,
     chunks: chunks.map((c) => ({ label: c.label })),
@@ -215,5 +268,11 @@ export async function reviewPullRequest(input: ReviewInput): Promise<ReviewOutco
     tokensOut,
     costUsd,
     raw: raws.join('\n---\n'),
+    scopeFilter,
   };
+}
+
+function stripScopeTag(f: ScopedFinding): Finding {
+  const { scope: _scope, ...rest } = f;
+  return rest;
 }

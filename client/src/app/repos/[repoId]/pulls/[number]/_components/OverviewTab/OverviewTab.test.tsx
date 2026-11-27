@@ -1,16 +1,28 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, cleanup, within } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import intent from "../../../../../../../../messages/en/intent.json";
 import runCost from "../../../../../../../../messages/en/runCost.json";
 import { OverviewTab } from "./OverviewTab";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
-function renderOverview(pr: Parameters<typeof OverviewTab>[0]["pr"]) {
+// The Overview now also hosts the Intent card, which reads through TanStack Query:
+// give it a client and a never-settling fetch so only the cost rows are asserted on.
+function renderOverview(
+  pr: Omit<Parameters<typeof OverviewTab>[0]["pr"], "id" | "head_sha">,
+) {
+  vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
   render(
-    <NextIntlClientProvider locale="en" messages={{ runCost }}>
-      <OverviewTab pr={pr} />
-    </NextIntlClientProvider>,
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <NextIntlClientProvider locale="en" messages={{ runCost, intent }}>
+        <OverviewTab pr={{ id: "pr-1", head_sha: "abc1234", ...pr }} />
+      </NextIntlClientProvider>
+    </QueryClientProvider>,
   );
 }
 

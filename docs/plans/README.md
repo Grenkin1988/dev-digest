@@ -24,3 +24,4 @@ Status values: `draft` · `approved` · `done` · `partial` · `blocked` · `sup
 | Plan | Status | Date | Summary |
 |------|--------|------|---------|
 | [2026-11-27-review-and-docs-subagents](2026-11-27-review-and-docs-subagents.md) | done | 2026-11-27 | Add test-writer, architecture-reviewer, plan-verifier and doc-writer subagents, a read-only Bash hook, and update the agents README |
+| [2026-11-27-intent-layer](2026-11-27-intent-layer.md) | done | 2026-11-27 | Intent Layer: flash-model PR intent classifier (author or changes-only mode), pr_intent persistence + stale/re-derive, scope-aware review filter keeping one serious signal, Overview Intent card |

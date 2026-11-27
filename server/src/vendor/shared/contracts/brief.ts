@@ -13,6 +13,54 @@ export const Intent = z.object({
 });
 export type Intent = z.infer<typeof Intent>;
 
+/** How sure the Intent Layer is; computed in code from available sources, never by the model. */
+export const IntentConfidence = z.enum(['high', 'medium', 'low']);
+export type IntentConfidence = z.infer<typeof IntentConfidence>;
+
+/** Whether the intent came from the author's description or was inferred from the changes alone. */
+export const IntentMode = z.enum(['author_description', 'inferred_from_changes']);
+export type IntentMode = z.infer<typeof IntentMode>;
+
+export const IntentSourceKind = z.enum([
+  'title',
+  'body',
+  'issue',
+  'doc',
+  'files',
+  'hunks',
+  'commits',
+  'added_lines',
+]);
+export type IntentSourceKind = z.infer<typeof IntentSourceKind>;
+
+/** One input that fed the intent: kind + reference + size. Never the content. */
+export const IntentSource = z.object({
+  kind: IntentSourceKind,
+  ref: z.string(),
+  chars: z.number().int(),
+  truncated: z.boolean(),
+});
+export type IntentSource = z.infer<typeof IntentSource>;
+
+export const MissingContextReason = z.enum([
+  'not_found',
+  'unreachable',
+  'no_token',
+  'timeout',
+  'not_present_at_head',
+  'path_not_allowlisted',
+  'too_large',
+  'host_not_allowlisted',
+]);
+export type MissingContextReason = z.infer<typeof MissingContextReason>;
+
+/** A referenced ticket/plan/spec/link that could not be used (never replaced by invention). */
+export const MissingContext = z.object({
+  ref: z.string(),
+  reason: MissingContextReason,
+});
+export type MissingContext = z.infer<typeof MissingContext>;
+
 // ---- Blast radius ----
 export const ChangedSymbol = z.object({
   name: z.string(),

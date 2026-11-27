@@ -1,4 +1,4 @@
-import type { ReviewDeps } from './deps.js';
+import type { ReviewDeps, ReviewIntentResolution } from './deps.js';
 import type { Provider, Review, RunTrace, UnifiedDiff } from '@devdigest/shared';
 import { reviewPullRequest, countBlockers } from '@devdigest/reviewer-core';
 import { RunLogger } from '../../platform/run-logger.js';
@@ -105,6 +105,18 @@ export class ReviewRunExecutor {
     }
     runLog.info(`Diff ready — ${diff.files.length} changed file(s); starting ${jobs.length} agent run(s)`);
 
+    // Shared pre-work: the PR's intent (reused, or derived once when absent).
+    // Best-effort — the resolver never rejects, and a failure is only a log line.
+    const intent = await runLog.step(
+      'Resolving PR intent',
+      async () => {
+        const res = await this.deps.intent(workspaceId, pull.id);
+        if (res) runLog.info(res.logLine);
+        return res;
+      },
+      { kind: 'tool' },
+    );
+
     for (const { agent, runId } of jobs) {
       const agentStart = Date.now();
       logger?.info(
@@ -112,7 +124,7 @@ export class ReviewRunExecutor {
         `review: agent "${agent.name}" started (${agent.provider}/${agent.model})`,
       );
       try {
-        const outcome = await this.runOneAgent(workspaceId, pull, repo, diff, agent, runId, runLog);
+        const outcome = await this.runOneAgent(workspaceId, pull, repo, diff, agent, runId, runLog, intent);
         logger?.info(
           {
             runId,
@@ -144,6 +156,7 @@ export class ReviewRunExecutor {
     agent: AgentRow,
     runId: string,
     parentLog: RunLogger,
+    intent?: ReviewIntentResolution,
   ): Promise<RunOutcome> {
     const start = Date.now();
     // Narrow the fanned-out pre-work logger to THIS run; the shared diff/intent
@@ -211,6 +224,8 @@ export class ReviewRunExecutor {
         // PR author's description/body — untrusted; assemblePrompt wraps +
         // truncates it. Omitted when the PR has no body.
         ...(pull.body ? { prDescription: pull.body } : {}),
+        // Derived PR intent (unverified claims + scope tagging). Omitted when none.
+        ...(intent?.intent ? { intent: intent.intent } : {}),
         task,
         sessionId: `${repo.owner}/${repo.name}#${pull.number}:${agent.name}`,
         onEvent: (e) => runLog.event(e.kind, e.msg, e.data),
@@ -219,6 +234,10 @@ export class ReviewRunExecutor {
         },
       });
       const { tokensIn, tokensOut, costUsd, grounding } = outcome;
+      // The engine logs the `scope filter:` line when the filter ran; say why when it did not.
+      if (!outcome.scopeFilter?.applied) {
+        runLog.info(`scope filter: off (${intent?.intent ? (intent.filterOffReason ?? 'disabled') : 'no intent'})`);
+      }
 
       const keptFindings = outcome.review.findings;
 

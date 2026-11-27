@@ -6,7 +6,7 @@ import React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, API_BASE } from "../api";
 import { notify } from "../toast";
-import { pullKeys, reviewKeys } from "./keys";
+import { intentKeys, pullKeys, reviewKeys } from "./keys";
 import type {
   FindingActionKind,
   PrReviewComment,
@@ -76,6 +76,8 @@ export function useInvalidateAfterRun(prId: string | null | undefined) {
           reviewKeys.activeRuns(prId),
           reviewKeys.runs(prId),
           reviewKeys.forPr(prId),
+          // A run auto-derives the intent when it is absent.
+          intentKeys.forPr(prId),
           pullKeys.detail(prId),
           // The detail screen reads the PR by number; its cache must refresh too
           // or the Overview cost stays stale after a run.
