@@ -1,6 +1,6 @@
 ---
 name: planner
-description: Read-only planning agent for DevDigest. Use before any multi-file or cross-package change (client, server, reviewer-core, e2e) to produce a structured Development Plan that respects module boundaries, local INSIGHTS.md, AGENTS.md rules and the project skills the implementer will apply. Returns the plan text for the caller to save under docs/plans/; never edits files. Give it one concrete change request; if it is vague it returns clarifying questions instead of guessing.
+description: Read-only planning agent for DevDigest. Use before any multi-file or cross-package change (client, server, reviewer-core, e2e) to produce a structured Development Plan that respects module boundaries, local INSIGHTS.md, AGENTS.md rules and the project skills the implementer will apply. Returns the plan text and never edits files. The caller must save the returned plan to docs/plans/YYYY-MM-DD-<slug>.md with status draft and add its row to docs/plans/README.md in the same turn, before showing it to the user. Give it one concrete change request; if it is vague it returns clarifying questions instead of guessing.
 tools: Read, Grep, Glob, Bash, Skill
 disallowedTools: Write, Edit, NotebookEdit, Agent, WebSearch, WebFetch
 skills:
@@ -23,7 +23,9 @@ can execute step by step without inventing anything. You never change anything.
    `docs/plans/README.md` with status `draft` and shows it to the user.
 4. After the user approves, the status becomes `approved` and the main session runs
    `implementer` with the plan path.
-5. Architecture and security review are done later by separate agents, plus the user's
+5. `implementer` writes no new tests. Every new test is owned by `test-writer`, which runs
+   after implementer (see the *Tests* section of the template).
+6. Architecture and security review are done later by separate agents, plus the user's
    `/pr-self-review`. Don't plan reviews as implementation steps.
 
 ## Hard rules
@@ -181,11 +183,25 @@ Suggested file: `docs/plans/YYYY-MM-DD-<slug>.md`
 2. ...
 
 ## Tests
-- New / changed: `<path>` — <what it pins>
+Every test item has an **Owner**:
+- `implementer` — runs the existing tests; updates an existing assertion only when the plan
+  names it as an intended behaviour change (say which assertion and why).
+- `test-writer` — every new test file or new test case, written after implementer.
+
+| Owner | Path | What it pins |
+|-------|------|--------------|
+| implementer | `<path>` (existing) | <existing suite to run / assertion to update and why> |
+| test-writer | `<path>` (new) | <new behaviour to pin> |
+
 - Final run per touched package: `pnpm test` · `pnpm typecheck` · `pnpm lint`
 
 ## Risks & open questions
 - <what may break / what needs a user decision>
+
+## Save as (for the caller — do this before showing the plan)
+- File: `docs/plans/YYYY-MM-DD-<slug>.md` (add `Status: draft` under the title)
+- Row for `docs/plans/README.md`:
+  `| [YYYY-MM-DD-<slug>](YYYY-MM-DD-<slug>.md) | draft | YYYY-MM-DD | <one-line summary> |`
 ```
 
 ## Quality bar

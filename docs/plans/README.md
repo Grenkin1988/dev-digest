@@ -12,7 +12,9 @@ and executed by the `implementer` subagent (`.claude/agents/implementer.md`).
    a plan that isn't `approved`.
 4. `implementer` runs with the plan path and returns an Implementation Report. The status
    becomes `done`, `partial` or `blocked`.
-5. Architecture and security review are done by separate agents, and the user runs
+5. `test-writer` runs after `implementer` and writes the new tests that the plan's *Tests*
+   section assigns to it. `implementer` writes no new tests.
+6. Architecture and security review are done by separate agents, and the user runs
    `/pr-self-review` before any PR.
 
 Status values: `draft` · `approved` · `done` · `partial` · `blocked` · `superseded`.
@@ -21,3 +23,4 @@ Status values: `draft` · `approved` · `done` · `partial` · `blocked` · `sup
 
 | Plan | Status | Date | Summary |
 |------|--------|------|---------|
+| [2026-11-27-review-and-docs-subagents](2026-11-27-review-and-docs-subagents.md) | done | 2026-11-27 | Add test-writer, architecture-reviewer, plan-verifier and doc-writer subagents, a read-only Bash hook, and update the agents README |
